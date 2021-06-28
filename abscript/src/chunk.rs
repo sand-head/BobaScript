@@ -2,6 +2,11 @@ use crate::value::Value;
 
 pub enum OpCode {
   Constant(usize),
+  Add,
+  Subtract,
+  Multiply,
+  Divide,
+  Negate,
   Return,
 }
 
