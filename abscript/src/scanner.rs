@@ -16,6 +16,7 @@ pub enum TokenType {
 
   Asterisk,
   Comma,
+  DollarSign,
   Minus,
   Period,
   Plus,
@@ -36,10 +37,13 @@ pub enum TokenType {
   Number,
 
   And,
+  Async,
+  Await,
   Break,
   Class,
   Const,
   Else,
+  Enum,
   False,
   For,
   If,
@@ -50,6 +54,7 @@ pub enum TokenType {
   This,
   True,
   While,
+  Yield,
 
   Error,
   EOF,
@@ -99,6 +104,7 @@ impl Scanner {
       ']' => Ok(self.make_token(TokenType::RightBracket)),
       '*' => Ok(self.make_token(TokenType::Asterisk)),
       ',' => Ok(self.make_token(TokenType::Comma)),
+      '$' => Ok(self.make_token(TokenType::DollarSign)),
       '-' => Ok(self.make_token(TokenType::Minus)),
       '.' => Ok(self.make_token(TokenType::Period)),
       '+' => Ok(self.make_token(TokenType::Plus)),
@@ -231,14 +237,23 @@ impl Scanner {
 
     // parse a keyword outta our identifier, or just leave it as-is
     self.make_token(match self.source[self.start] {
-      'a' => self.check_keyword(1, 2, "nd", TokenType::And),
+      'a' if self.current - self.start > 1 => match self.source[self.start + 1] {
+        'n' => self.check_keyword(2, 1, "d", TokenType::And),
+        's' => self.check_keyword(2, 3, "ync", TokenType::Async),
+        'w' => self.check_keyword(2, 3, "ait", TokenType::Await),
+        _ => TokenType::Identifier,
+      },
       'b' => self.check_keyword(1, 4, "reak", TokenType::Break),
       'c' if self.current - self.start > 1 => match self.source[self.start + 1] {
         'l' => self.check_keyword(2, 3, "ass", TokenType::Class),
         'o' => self.check_keyword(2, 3, "nst", TokenType::Const),
         _ => TokenType::Identifier,
       },
-      'e' => self.check_keyword(1, 3, "lse", TokenType::Else),
+      'e' if self.current - self.start > 1 => match self.source[self.start + 1] {
+        'l' => self.check_keyword(2, 2, "se", TokenType::Else),
+        'n' => self.check_keyword(2, 2, "um", TokenType::Enum),
+        _ => TokenType::Identifier,
+      },
       'f' if self.current - self.start > 1 => match self.source[self.start + 1] {
         'a' => self.check_keyword(2, 3, "lse", TokenType::False),
         'o' => self.check_keyword(2, 1, "r", TokenType::For),
@@ -255,6 +270,7 @@ impl Scanner {
         _ => TokenType::Identifier,
       },
       'w' => self.check_keyword(1, 4, "hile", TokenType::While),
+      'y' => self.check_keyword(1, 4, "ield", TokenType::Yield),
       _ => TokenType::Identifier,
     })
   }
