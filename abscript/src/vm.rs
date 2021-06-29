@@ -1,5 +1,6 @@
 use crate::{
   chunk::{Chunk, OpCode},
+  compiler::compile,
   debug::disassemble_instruction,
   value::Value,
 };
@@ -30,10 +31,17 @@ impl VM {
     }
   }
 
-  pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
+  pub fn interpret<S>(&mut self, source: S) -> InterpretResult
+  where
+    S: Into<String>,
+  {
+    /*
     self.chunk = chunk;
     self.ip = 0;
     self.run()
+    */
+    compile(source.into());
+    InterpretResult::Ok
   }
 
   fn push(&mut self, value: Value) {
