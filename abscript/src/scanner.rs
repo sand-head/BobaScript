@@ -92,7 +92,8 @@ impl Scanner {
       return Ok(self.make_token(TokenType::EOF));
     }
 
-    match self.advance() {
+    let current_char = self.advance();
+    match current_char {
       '0'..='9' => Ok(self.make_number()),
       'a'..='z' | 'A'..='Z' | '_' => Ok(self.make_identifier()),
       '"' => Ok(self.make_string()?),
@@ -130,7 +131,7 @@ impl Scanner {
       } else {
         self.make_token(TokenType::GreaterThan)
       }),
-      _ => Err(ScanError::UnexpectedCharacter(self.source[self.current])),
+      _ => Err(ScanError::UnexpectedCharacter(current_char)),
     }
   }
 

@@ -3,16 +3,11 @@ use crate::{
   compiler::compile,
   debug::disassemble_instruction,
   value::Value,
+  InterpretResult,
 };
 
 macro_rules! binary_op {
   ($a: expr, $op: tt, $b: expr) => {{ $a $op $b }};
-}
-
-pub enum InterpretResult {
-  Ok,
-  CompileError,
-  RuntimeError,
 }
 
 pub struct VM {
@@ -31,7 +26,7 @@ impl VM {
     }
   }
 
-  pub fn interpret<S>(&mut self, source: S) -> InterpretResult
+  pub fn interpret<S>(&mut self, source: S) -> InterpretResult<()>
   where
     S: Into<String>,
   {
@@ -40,8 +35,8 @@ impl VM {
     self.ip = 0;
     self.run()
     */
-    compile(source.into());
-    InterpretResult::Ok
+    compile(source.into())?;
+    Ok(())
   }
 
   fn push(&mut self, value: Value) {
@@ -52,7 +47,7 @@ impl VM {
     self.stack.pop().unwrap()
   }
 
-  fn run(&mut self) -> InterpretResult {
+  fn run(&mut self) -> InterpretResult<()> {
     loop {
       let (instruction, line) = {
         let instruction = &self.chunk.code[self.ip];
@@ -104,7 +99,7 @@ impl VM {
         }
         OpCode::Return => {
           println!("{}", self.pop());
-          return InterpretResult::Ok;
+          return Ok(());
         }
         _ => continue,
       }

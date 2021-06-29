@@ -1,8 +1,8 @@
 use std::io::{stdin, stdout, Write};
 
-use abscript::vm::VM;
+use abscript::{vm::VM, InterpretResult};
 
-fn main() {
+fn main() -> InterpretResult<()> {
   let mut vm = VM::new(Option::Some(true));
 
   loop {
@@ -14,6 +14,9 @@ fn main() {
       .read_line(&mut input)
       .expect("Could not read input from console");
 
-    vm.interpret(input);
+    match vm.interpret(input) {
+      Err(e) => println!("Error: {}", e),
+      _ => continue,
+    }
   }
 }
