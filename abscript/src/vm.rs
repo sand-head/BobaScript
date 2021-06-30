@@ -67,26 +67,26 @@ impl VM {
           self.push(self.chunk.constants[*idx].clone());
         }
         OpCode::Add => {
-          let Value::Number(a) = self.pop();
           let Value::Number(b) = self.pop();
+          let Value::Number(a) = self.pop();
 
           self.push(Value::Number(binary_op!(a, +, b)));
         }
         OpCode::Subtract => {
-          let Value::Number(a) = self.pop();
           let Value::Number(b) = self.pop();
+          let Value::Number(a) = self.pop();
 
           self.push(Value::Number(binary_op!(a, -, b)));
         }
         OpCode::Multiply => {
-          let Value::Number(a) = self.pop();
           let Value::Number(b) = self.pop();
+          let Value::Number(a) = self.pop();
 
           self.push(Value::Number(binary_op!(a, *, b)));
         }
         OpCode::Divide => {
-          let Value::Number(a) = self.pop();
           let Value::Number(b) = self.pop();
+          let Value::Number(a) = self.pop();
 
           self.push(Value::Number(binary_op!(a, /, b)));
         }

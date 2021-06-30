@@ -139,7 +139,7 @@ impl Scanner {
     if self.is_at_end() {
       '\0'
     } else {
-      self.source[self.current]
+      self.source[self.current + 1]
     }
   }
 
