@@ -1,6 +1,6 @@
 use crate::{
   chunk::{Chunk, OpCode},
-  compiler::compile,
+  compiler::Compiler,
   debug::disassemble_instruction,
   value::Value,
   InterpretResult,
@@ -14,15 +14,13 @@ pub struct VM {
   chunk: Chunk,
   ip: usize,
   stack: Vec<Value>,
-  debug: bool,
 }
 impl VM {
-  pub fn new(debug: Option<bool>) -> Self {
+  pub fn new() -> Self {
     Self {
       chunk: Chunk::default(),
       ip: 0,
       stack: Vec::with_capacity(256),
-      debug: debug.unwrap_or(false),
     }
   }
 
@@ -30,13 +28,13 @@ impl VM {
   where
     S: Into<String>,
   {
-    /*
+    let mut chunk = Chunk::default();
+    let mut compiler = Compiler::new(&mut chunk);
+    compiler.compile(source.into());
+
     self.chunk = chunk;
     self.ip = 0;
-    self.run()
-    */
-    compile(source.into())?;
-    Ok(())
+    Ok(self.run()?)
   }
 
   fn push(&mut self, value: Value) {
@@ -55,7 +53,7 @@ impl VM {
         instruction
       };
 
-      if self.debug {
+      if crate::DEBUG {
         print!("\t");
         for value in self.stack.iter() {
           print!("[{}]", value);

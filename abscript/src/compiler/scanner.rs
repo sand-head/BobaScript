@@ -1,11 +1,12 @@
-use thiserror::Error;
+use super::{CompileError, CompileResult};
 
+#[derive(Debug, Clone)]
 pub struct Token {
   pub token_type: TokenType,
   pub line: usize,
   pub lexeme: String,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
   LeftParen,
   RightParen,
@@ -56,16 +57,7 @@ pub enum TokenType {
   While,
   Yield,
 
-  Error,
   EOF,
-}
-
-#[derive(Error, Debug)]
-pub enum ScanError {
-  #[error("Unexpected character '{0}'.")]
-  UnexpectedCharacter(char),
-  #[error("Unterminated string.")]
-  UnterminatedString,
 }
 
 pub struct Scanner {
@@ -84,7 +76,7 @@ impl Scanner {
     }
   }
 
-  pub fn scan_token(&mut self) -> Result<Token, ScanError> {
+  pub fn scan_token(&mut self) -> CompileResult<Token> {
     self.skip_whitespace();
     self.start = self.current;
 
@@ -131,7 +123,7 @@ impl Scanner {
       } else {
         self.make_token(TokenType::GreaterThan)
       }),
-      _ => Err(ScanError::UnexpectedCharacter(current_char)),
+      _ => Err(CompileError::UnexpectedCharacter(self.line, current_char)),
     }
   }
 
@@ -262,7 +254,7 @@ impl Scanner {
       },
       'i' => self.check_keyword(1, 1, "f", TokenType::If),
       'l' => self.check_keyword(1, 2, "et", TokenType::Let),
-      'o' => self.check_keyword(1, 1, "r", TokenType::Break),
+      'o' => self.check_keyword(1, 1, "r", TokenType::Or),
       'r' => self.check_keyword(1, 5, "eturn", TokenType::Return),
       's' => self.check_keyword(1, 4, "uper", TokenType::Super),
       't' if self.current - self.start > 1 => match self.source[self.start + 1] {
@@ -276,7 +268,7 @@ impl Scanner {
     })
   }
 
-  fn make_string(&mut self) -> Result<Token, ScanError> {
+  fn make_string(&mut self) -> CompileResult<Token> {
     while self.peek() != '"' && !self.is_at_end() {
       if self.peek() == '\n' {
         self.line += 1;
@@ -285,7 +277,7 @@ impl Scanner {
     }
 
     if self.is_at_end() {
-      Err(ScanError::UnterminatedString)
+      Err(CompileError::UnterminatedString(self.line))
     } else {
       self.advance();
       Ok(self.make_token(TokenType::String))

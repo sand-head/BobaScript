@@ -1,5 +1,5 @@
 [package]
-name = "abscript-repl"
+name = "abscript-cli"
 version = "0.1.0"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
@@ -12,4 +12,4 @@ members = [
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-abscript = { path = "abscript" }
+abscript = { path = "abscript", features = ["debug"] }

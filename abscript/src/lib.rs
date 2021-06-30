@@ -1,19 +1,23 @@
-use scanner::ScanError;
+use compiler::CompileError;
 use thiserror::Error;
 
 pub mod chunk;
 pub mod compiler;
 pub mod debug;
-pub mod scanner;
 pub mod value;
 pub mod vm;
+
+#[cfg(not(feature = "debug"))]
+pub const DEBUG: bool = false;
+#[cfg(feature = "debug")]
+pub const DEBUG: bool = true;
 
 pub type InterpretResult<T> = Result<T, InterpretError>;
 
 #[derive(Error, Debug)]
 pub enum InterpretError {
-  #[error("An error occurred while scanning the source code: {0}")]
-  ScanError(#[from] ScanError),
+  #[error("Compile error: {0}")]
+  CompileError(#[from] CompileError),
 }
 
 #[cfg(test)]

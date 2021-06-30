@@ -3,7 +3,7 @@ use std::io::{stdin, stdout, Write};
 use abscript::{vm::VM, InterpretResult};
 
 fn main() -> InterpretResult<()> {
-  let mut vm = VM::new(Option::Some(true));
+  let mut vm = VM::new();
 
   loop {
     let mut input = String::new();
@@ -15,7 +15,7 @@ fn main() -> InterpretResult<()> {
       .expect("Could not read input from console");
 
     match vm.interpret(input) {
-      Err(e) => println!("Error: {}", e),
+      Err(e) => eprintln!("Error: {}", e),
       _ => continue,
     }
   }
