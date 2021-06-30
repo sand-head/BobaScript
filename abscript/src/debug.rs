@@ -10,16 +10,8 @@ pub fn disassemble_chunk(chunk: &Chunk, name: &str) {
 
 pub fn disassemble_instruction(chunk: &Chunk, opcode: &OpCode, line: &usize, offset: usize) {
   let instruction = match opcode {
-    OpCode::Constant(idx) => format!(
-      "{} {:0>#4} {}",
-      "OpCode::Constant", idx, chunk.constants[*idx]
-    ),
-    OpCode::Add => "OpCode::Add".to_string(),
-    OpCode::Subtract => "OpCode::Subtract".to_string(),
-    OpCode::Multiply => "OpCode::Multiply".to_string(),
-    OpCode::Divide => "OpCode::Divide".to_string(),
-    OpCode::Negate => "OpCode::Negate".to_string(),
-    OpCode::Return => "OpCode::Return".to_string(),
+    OpCode::Constant(idx) => format!("Constant {:0>#4} {}", idx, chunk.constants[*idx]),
+    _ => format!("{:?}", opcode),
   };
   println!("{:0>#4} #{:0>#4} {}", offset, line, instruction);
 }

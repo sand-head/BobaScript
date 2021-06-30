@@ -90,6 +90,12 @@ impl VM {
 
           self.push(Value::Number(binary_op!(a, /, b)));
         }
+        OpCode::Exponent => {
+          let Value::Number(b) = self.pop();
+          let Value::Number(a) = self.pop();
+
+          self.push(Value::Number(f64::powf(a, b)));
+        }
         OpCode::Negate => {
           if let Value::Number(num) = self.pop() {
             self.push(Value::Number(-num));

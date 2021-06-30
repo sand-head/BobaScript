@@ -96,9 +96,10 @@ impl<'a> Compiler<'a> {
     self.parse_precedence((rule + 1).into());
 
     match binary_operator {
-      TokenType::Plus => self.emit_opcode(OpCode::Add),
-      TokenType::Minus => self.emit_opcode(OpCode::Subtract),
       TokenType::Asterisk => self.emit_opcode(OpCode::Multiply),
+      TokenType::Carrot => self.emit_opcode(OpCode::Exponent),
+      TokenType::Minus => self.emit_opcode(OpCode::Subtract),
+      TokenType::Plus => self.emit_opcode(OpCode::Add),
       TokenType::Slash => self.emit_opcode(OpCode::Divide),
       _ => unreachable!(),
     }
@@ -142,6 +143,7 @@ fn get_rule(token_type: TokenType) -> ParseRule {
   match token_type {
     TokenType::LeftParen => parse_prefix!(|c| c.grouping(), None),
     TokenType::Asterisk => parse_infix!(|c| c.binary(), Factor),
+    TokenType::Carrot => parse_infix!(|c| c.binary(), Exponent),
     TokenType::Minus => parse_both!(|c| c.unary(), |c| c.binary(), Term),
     TokenType::Plus => parse_infix!(|c| c.binary(), Term),
     TokenType::Slash => parse_infix!(|c| c.binary(), Factor),

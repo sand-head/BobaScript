@@ -16,6 +16,7 @@ pub enum TokenType {
   RightBracket,
 
   Asterisk,
+  Carrot,
   Comma,
   DollarSign,
   Minus,
@@ -96,6 +97,7 @@ impl Scanner {
       '[' => Ok(self.make_token(TokenType::LeftBracket)),
       ']' => Ok(self.make_token(TokenType::RightBracket)),
       '*' => Ok(self.make_token(TokenType::Asterisk)),
+      '^' => Ok(self.make_token(TokenType::Carrot)),
       ',' => Ok(self.make_token(TokenType::Comma)),
       '$' => Ok(self.make_token(TokenType::DollarSign)),
       '-' => Ok(self.make_token(TokenType::Minus)),
