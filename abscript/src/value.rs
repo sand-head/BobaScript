@@ -2,7 +2,7 @@ use std::{convert::TryInto, fmt};
 
 use crate::vm::RuntimeError;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum Value {
   Number(f64),
   Boolean(bool),

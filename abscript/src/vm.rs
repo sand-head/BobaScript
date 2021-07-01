@@ -82,6 +82,14 @@ impl VM {
     Ok(value)
   }
 
+  fn values_equal(&self, a: Value, b: Value) -> bool {
+    match (a, b) {
+      (Value::Number(a), Value::Number(b)) => a == b,
+      (Value::Boolean(a), Value::Boolean(b)) => a == b,
+      _ => false,
+    }
+  }
+
   fn run(&mut self) -> InterpretResult<()> {
     loop {
       let (instruction, line) = {
@@ -106,6 +114,20 @@ impl VM {
         }
         OpCode::True => self.push(Value::Boolean(true)),
         OpCode::False => self.push(Value::Boolean(false)),
+        OpCode::Equal => {
+          let b = self.pop();
+          let a = self.pop();
+          let value = self.values_equal(a, b);
+          self.push(Value::Boolean(value));
+        }
+        OpCode::GreaterThan => {
+          let value = binary_op!(self, f64, |a, b| a > b)?;
+          self.push(Value::Boolean(value));
+        }
+        OpCode::LessThan => {
+          let value = binary_op!(self, f64, |a, b| a < b)?;
+          self.push(Value::Boolean(value));
+        }
         OpCode::Add => {
           let value = binary_op!(self, f64, |a, b| a + b)?;
           self.push(Value::Number(value));

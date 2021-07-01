@@ -102,6 +102,21 @@ impl<'a> Compiler<'a> {
       TokenType::Minus => self.emit_opcode(OpCode::Subtract),
       TokenType::Plus => self.emit_opcode(OpCode::Add),
       TokenType::Slash => self.emit_opcode(OpCode::Divide),
+      TokenType::NotEqual => {
+        self.emit_opcode(OpCode::Equal);
+        self.emit_opcode(OpCode::Not);
+      }
+      TokenType::Equal => self.emit_opcode(OpCode::Equal),
+      TokenType::GreaterThan => self.emit_opcode(OpCode::GreaterThan),
+      TokenType::GreaterEqual => {
+        self.emit_opcode(OpCode::LessThan);
+        self.emit_opcode(OpCode::Not);
+      }
+      TokenType::LessThan => self.emit_opcode(OpCode::LessThan),
+      TokenType::LessEqual => {
+        self.emit_opcode(OpCode::GreaterThan);
+        self.emit_opcode(OpCode::Not);
+      }
       _ => unreachable!(),
     }
   }
@@ -160,6 +175,12 @@ fn get_rule(token_type: TokenType) -> ParseRule {
     TokenType::Slash => parse_infix!(|c| c.binary(), Factor),
 
     TokenType::Not => parse_prefix!(|c| c.unary(), None),
+    TokenType::NotEqual => parse_infix!(|c| c.binary(), Equality),
+    TokenType::Equal => parse_infix!(|c| c.binary(), Equality),
+    TokenType::GreaterThan => parse_infix!(|c| c.binary(), Comparison),
+    TokenType::GreaterEqual => parse_infix!(|c| c.binary(), Comparison),
+    TokenType::LessThan => parse_infix!(|c| c.binary(), Comparison),
+    TokenType::LessEqual => parse_infix!(|c| c.binary(), Comparison),
 
     TokenType::Number => parse_prefix!(|c| c.number(), None),
 
