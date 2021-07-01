@@ -13,3 +13,4 @@ members = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 abscript = { path = "abscript", features = ["debug"] }
+termcolor = "1.1"

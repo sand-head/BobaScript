@@ -18,7 +18,7 @@ mod scanner;
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, Copy)]
 pub enum CompileError {
   #[error("Unexpected character '{1}' on line {0}.")]
   UnexpectedCharacter(usize, char),
@@ -40,7 +40,7 @@ impl<'a> Compiler<'a> {
     }
   }
 
-  pub fn compile(&mut self, source: String) -> bool {
+  pub fn compile(&mut self, source: String) -> CompileResult<()> {
     self.parser = Parser::new(source);
 
     self.parser.advance();
@@ -50,7 +50,10 @@ impl<'a> Compiler<'a> {
       .consume(TokenType::EOF, CompileError::Expected("end of expression"));
     self.end_compiler();
 
-    !self.parser.had_error
+    match &self.parser.error {
+      None => Ok(()),
+      Some(err) => Err(*err),
+    }
   }
 
   fn parse_precedence(&mut self, precedence: Precedence) {
@@ -59,9 +62,7 @@ impl<'a> Compiler<'a> {
 
     match rule_prefix {
       Some(prefix) => prefix(self),
-      None => self
-        .parser
-        .print_error(CompileError::Expected("expression")),
+      None => self.parser.set_error(CompileError::Expected("expression")),
     }
 
     while precedence <= get_rule(self.parser.current.as_ref().unwrap().token_type).precedence {
@@ -138,6 +139,14 @@ impl<'a> Compiler<'a> {
     );
   }
 
+  fn string(&mut self) {
+    let string = self.parser.previous.as_ref().unwrap().lexeme.clone();
+    // strip the leading and trailing quotation mark off the lexeme:
+    let string = string[1..(string.len() - 1)].to_string();
+    let string_idx = self.make_constant(Value::String(string));
+    self.emit_opcode(OpCode::Constant(string_idx))
+  }
+
   fn number(&mut self) {
     let num = &self.parser.previous.as_ref().unwrap().lexeme;
     let num = num.parse::<f64>().unwrap();
@@ -157,7 +166,7 @@ impl<'a> Compiler<'a> {
 
   fn end_compiler(&mut self) {
     self.emit_opcode(OpCode::Return);
-    if crate::DEBUG && !self.parser.had_error {
+    if crate::DEBUG && self.parser.error.is_none() {
       disassemble_chunk(self.chunk, "code");
     }
   }
@@ -182,6 +191,7 @@ fn get_rule(token_type: TokenType) -> ParseRule {
     TokenType::LessThan => parse_infix!(|c| c.binary(), Comparison),
     TokenType::LessEqual => parse_infix!(|c| c.binary(), Comparison),
 
+    TokenType::String => parse_prefix!(|c| c.string(), None),
     TokenType::Number => parse_prefix!(|c| c.number(), None),
 
     TokenType::False => parse_prefix!(|c| c.literal(), None),

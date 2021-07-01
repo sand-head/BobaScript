@@ -7,7 +7,7 @@ pub struct Parser {
   scanner: Scanner,
   pub current: Option<Token>,
   pub previous: Option<Token>,
-  pub had_error: bool,
+  pub error: Option<CompileError>,
   panic_mode: bool,
 }
 impl Parser {
@@ -16,7 +16,7 @@ impl Parser {
       scanner: Scanner::new(source),
       current: None,
       previous: None,
-      had_error: false,
+      error: None,
       panic_mode: false,
     }
   }
@@ -34,7 +34,7 @@ impl Parser {
         }
         Err(e) => {
           self.current = None;
-          self.print_error(e);
+          self.set_error(e);
         }
       }
     }
@@ -47,14 +47,13 @@ impl Parser {
       }
     }
 
-    self.print_error(err);
+    self.set_error(err);
   }
 
-  pub fn print_error(&mut self, err: CompileError) {
+  pub fn set_error(&mut self, err: CompileError) {
     if !self.panic_mode {
       self.panic_mode = true;
-      self.had_error = true;
-      eprintln!("{}", err);
+      self.error = Some(err);
     }
   }
 }

@@ -2,10 +2,11 @@ use std::{convert::TryInto, fmt};
 
 use crate::vm::RuntimeError;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
   Number(f64),
   Boolean(bool),
+  String(String),
 }
 
 impl TryInto<f64> for Value {
@@ -26,8 +27,8 @@ impl TryInto<bool> for Value {
   type Error = RuntimeError;
 
   fn try_into(self) -> Result<bool, Self::Error> {
-    if let Value::Boolean(boolean) = self {
-      Ok(boolean)
+    if let Value::Boolean(bool) = self {
+      Ok(bool)
     } else {
       Err(RuntimeError::TypeError {
         expected: "boolean",
@@ -36,12 +37,24 @@ impl TryInto<bool> for Value {
     }
   }
 }
+impl TryInto<String> for Value {
+  type Error = RuntimeError;
+
+  fn try_into(self) -> Result<String, Self::Error> {
+    Ok(match self {
+      Value::Number(num) => format!("{}", num),
+      Value::Boolean(bool) => format!("{}", bool),
+      Value::String(str) => str,
+    })
+  }
+}
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let value: String = Value::try_into(self.clone()).unwrap();
     match self {
-      Self::Number(num) => write!(f, "{}", num),
-      Self::Boolean(boolean) => write!(f, "{}", boolean),
+      Self::String(_) => write!(f, "\"{}\"", value),
+      _ => write!(f, "{}", value),
     }
   }
 }

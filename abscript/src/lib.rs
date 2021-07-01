@@ -17,6 +17,8 @@ pub type InterpretResult<T> = Result<T, InterpretError>;
 
 #[derive(Error, Debug)]
 pub enum InterpretError {
+  #[error("An unknown error has occurred.")]
+  Unknown,
   #[error("Compile error: {0}")]
   CompileError(#[from] CompileError),
   #[error("Runtime error: {0}")]

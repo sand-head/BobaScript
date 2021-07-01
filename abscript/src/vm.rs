@@ -28,6 +28,8 @@ pub enum RuntimeError {
     expected: &'static str,
     found: Value,
   },
+  #[error("The attempted operation is not supported.")]
+  OperationNotSupported,
 }
 
 pub struct VM {
@@ -44,17 +46,23 @@ impl VM {
     }
   }
 
-  pub fn interpret<S>(&mut self, source: S) -> InterpretResult<()>
+  pub fn interpret<S>(&mut self, source: S) -> InterpretResult<Value>
   where
     S: Into<String>,
   {
     let mut chunk = Chunk::default();
     let mut compiler = Compiler::new(&mut chunk);
-    compiler.compile(source.into());
-
-    self.chunk = chunk;
-    self.ip = 0;
-    Ok(self.run()?)
+    match compiler.compile(source.into()) {
+      Ok(_) => {
+        self.chunk = chunk;
+        self.ip = 0;
+        self.run()
+      }
+      Err(err) => {
+        self.stack.clear();
+        Err(err.into())
+      }
+    }
   }
 
   fn push(&mut self, value: Value) {
@@ -86,11 +94,12 @@ impl VM {
     match (a, b) {
       (Value::Number(a), Value::Number(b)) => a == b,
       (Value::Boolean(a), Value::Boolean(b)) => a == b,
+      (Value::String(a), Value::String(b)) => a == b,
       _ => false,
     }
   }
 
-  fn run(&mut self) -> InterpretResult<()> {
+  fn run(&mut self) -> InterpretResult<Value> {
     loop {
       let (instruction, line) = {
         let instruction = &self.chunk.code[self.ip];
@@ -129,8 +138,21 @@ impl VM {
           self.push(Value::Boolean(value));
         }
         OpCode::Add => {
-          let value = binary_op!(self, f64, |a, b| a + b)?;
-          self.push(Value::Number(value));
+          let b = self.peek(0).ok_or_else(|| RuntimeError::Unknown)?.clone();
+          let a = self.peek(1).ok_or_else(|| RuntimeError::Unknown)?.clone();
+
+          match (a, b) {
+            (Value::Number(_), Value::Number(_)) => {
+              let value = binary_op!(self, f64, |a, b| a + b)?;
+              self.push(Value::Number(value));
+            }
+            (Value::String(a), Value::String(b)) => {
+              self.pop();
+              self.pop();
+              self.push(Value::String(format!("{}{}", a, b)));
+            }
+            _ => return Err(RuntimeError::OperationNotSupported.into()),
+          }
         }
         OpCode::Subtract => {
           let value = binary_op!(self, f64, |a, b| a - b)?;
@@ -157,8 +179,7 @@ impl VM {
           self.push(Value::Number(-value));
         }
         OpCode::Return => {
-          println!("{}", self.pop());
-          return Ok(());
+          return Ok(self.pop());
         }
       }
     }
