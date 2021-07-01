@@ -1,3 +1,7 @@
+use std::convert::TryInto;
+
+use thiserror::Error;
+
 use crate::{
   chunk::{Chunk, OpCode},
   compiler::Compiler,
@@ -7,7 +11,23 @@ use crate::{
 };
 
 macro_rules! binary_op {
-  ($a: expr, $op: tt, $b: expr) => {{ $a $op $b }};
+  ($compiler:expr, $value_type:ident, $op:expr) => {{
+    let b = $compiler.peek_and_pop_as::<$value_type>();
+    let a = $compiler.peek_and_pop_as::<$value_type>();
+
+    a.and_then(|a| b.and_then(|b| Ok($op(a, b))))
+  }};
+}
+
+#[derive(Debug, Error)]
+pub enum RuntimeError {
+  #[error("An unknown error has occurred.")]
+  Unknown,
+  #[error("Type error: expected value of type \"{expected}\", found {found}.")]
+  TypeError {
+    expected: &'static str,
+    found: Value,
+  },
 }
 
 pub struct VM {
@@ -41,8 +61,25 @@ impl VM {
     self.stack.push(value)
   }
 
+  fn peek(&self, n: usize) -> Option<&Value> {
+    self.stack.iter().nth_back(n)
+  }
+
   fn pop(&mut self) -> Value {
     self.stack.pop().unwrap()
+  }
+
+  fn peek_and_pop_as<T>(&mut self) -> InterpretResult<T>
+  where
+    Value: TryInto<T, Error = RuntimeError>,
+  {
+    let value: T = self
+      .peek(0)
+      .ok_or_else(|| RuntimeError::Unknown)?
+      .to_owned()
+      .try_into()?;
+    self.pop();
+    Ok(value)
   }
 
   fn run(&mut self) -> InterpretResult<()> {
@@ -64,48 +101,43 @@ impl VM {
 
       match instruction {
         OpCode::Constant(idx) => {
-          self.push(self.chunk.constants[*idx].clone());
+          let constant = self.chunk.constants[*idx].clone();
+          self.push(constant);
         }
+        OpCode::True => self.push(Value::Boolean(true)),
+        OpCode::False => self.push(Value::Boolean(false)),
         OpCode::Add => {
-          let Value::Number(b) = self.pop();
-          let Value::Number(a) = self.pop();
-
-          self.push(Value::Number(binary_op!(a, +, b)));
+          let value = binary_op!(self, f64, |a, b| a + b)?;
+          self.push(Value::Number(value));
         }
         OpCode::Subtract => {
-          let Value::Number(b) = self.pop();
-          let Value::Number(a) = self.pop();
-
-          self.push(Value::Number(binary_op!(a, -, b)));
+          let value = binary_op!(self, f64, |a, b| a - b)?;
+          self.push(Value::Number(value));
         }
         OpCode::Multiply => {
-          let Value::Number(b) = self.pop();
-          let Value::Number(a) = self.pop();
-
-          self.push(Value::Number(binary_op!(a, *, b)));
+          let value = binary_op!(self, f64, |a, b| a * b)?;
+          self.push(Value::Number(value));
         }
         OpCode::Divide => {
-          let Value::Number(b) = self.pop();
-          let Value::Number(a) = self.pop();
-
-          self.push(Value::Number(binary_op!(a, /, b)));
+          let value = binary_op!(self, f64, |a, b| a / b)?;
+          self.push(Value::Number(value));
         }
         OpCode::Exponent => {
-          let Value::Number(b) = self.pop();
-          let Value::Number(a) = self.pop();
-
-          self.push(Value::Number(f64::powf(a, b)));
+          let value = binary_op!(self, f64, |a, b| f64::powf(a, b))?;
+          self.push(Value::Number(value));
+        }
+        OpCode::Not => {
+          let value = self.peek_and_pop_as::<bool>()?;
+          self.push(Value::Boolean(!value));
         }
         OpCode::Negate => {
-          if let Value::Number(num) = self.pop() {
-            self.push(Value::Number(-num));
-          }
+          let value = self.peek_and_pop_as::<f64>()?;
+          self.push(Value::Number(-value));
         }
         OpCode::Return => {
           println!("{}", self.pop());
           return Ok(());
         }
-        _ => continue,
       }
     }
   }

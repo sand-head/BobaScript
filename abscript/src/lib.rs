@@ -1,5 +1,6 @@
 use compiler::CompileError;
 use thiserror::Error;
+use vm::RuntimeError;
 
 pub mod chunk;
 pub mod compiler;
@@ -18,6 +19,8 @@ pub type InterpretResult<T> = Result<T, InterpretError>;
 pub enum InterpretError {
   #[error("Compile error: {0}")]
   CompileError(#[from] CompileError),
+  #[error("Runtime error: {0}")]
+  RuntimeError(#[from] RuntimeError),
 }
 
 #[cfg(test)]

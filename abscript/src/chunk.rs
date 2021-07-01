@@ -3,11 +3,14 @@ use crate::value::Value;
 #[derive(Debug)]
 pub enum OpCode {
   Constant(usize),
+  True,
+  False,
   Add,
   Subtract,
   Multiply,
   Divide,
   Exponent,
+  Not,
   Negate,
   Return,
 }

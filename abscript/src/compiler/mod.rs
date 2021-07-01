@@ -78,7 +78,7 @@ impl<'a> Compiler<'a> {
   }
 
   fn unary(&mut self) {
-    let unary_operator = self.parser.previous.as_ref().unwrap().token_type.clone();
+    let unary_operator = self.parser.previous.as_ref().unwrap().token_type;
 
     // compile the operand
     self.parse_precedence(Precedence::Unary);
@@ -86,12 +86,13 @@ impl<'a> Compiler<'a> {
     // emit the operator
     match unary_operator {
       TokenType::Minus => self.emit_opcode(OpCode::Negate),
+      TokenType::Not => self.emit_opcode(OpCode::Not),
       _ => unreachable!(),
     }
   }
 
   fn binary(&mut self) {
-    let binary_operator = self.parser.previous.as_ref().unwrap().token_type.clone();
+    let binary_operator = self.parser.previous.as_ref().unwrap().token_type;
     let rule: usize = get_rule(binary_operator).precedence.into();
     self.parse_precedence((rule + 1).into());
 
@@ -101,6 +102,15 @@ impl<'a> Compiler<'a> {
       TokenType::Minus => self.emit_opcode(OpCode::Subtract),
       TokenType::Plus => self.emit_opcode(OpCode::Add),
       TokenType::Slash => self.emit_opcode(OpCode::Divide),
+      _ => unreachable!(),
+    }
+  }
+
+  fn literal(&mut self) {
+    let previous_type = self.parser.previous.as_ref().unwrap().token_type;
+    match previous_type {
+      TokenType::False => self.emit_opcode(OpCode::False),
+      TokenType::True => self.emit_opcode(OpCode::True),
       _ => unreachable!(),
     }
   }
@@ -142,12 +152,20 @@ impl<'a> Compiler<'a> {
 fn get_rule(token_type: TokenType) -> ParseRule {
   match token_type {
     TokenType::LeftParen => parse_prefix!(|c| c.grouping(), None),
+
     TokenType::Asterisk => parse_infix!(|c| c.binary(), Factor),
     TokenType::Carrot => parse_infix!(|c| c.binary(), Exponent),
     TokenType::Minus => parse_both!(|c| c.unary(), |c| c.binary(), Term),
     TokenType::Plus => parse_infix!(|c| c.binary(), Term),
     TokenType::Slash => parse_infix!(|c| c.binary(), Factor),
+
+    TokenType::Not => parse_prefix!(|c| c.unary(), None),
+
     TokenType::Number => parse_prefix!(|c| c.number(), None),
+
+    TokenType::False => parse_prefix!(|c| c.literal(), None),
+    TokenType::True => parse_prefix!(|c| c.literal(), None),
+
     _ => parse_none!(),
   }
 }
