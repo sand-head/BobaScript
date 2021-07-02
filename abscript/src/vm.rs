@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, iter::repeat};
 
 use thiserror::Error;
 
@@ -73,8 +73,20 @@ impl VM {
     self.stack.iter().nth_back(n)
   }
 
-  fn pop(&mut self) -> Value {
-    self.stack.pop().unwrap()
+  fn pop(&mut self) -> Option<Value> {
+    self.stack.pop()
+  }
+
+  fn pop_as<T>(&mut self) -> InterpretResult<T>
+  where
+    Value: TryInto<T, Error = RuntimeError>,
+  {
+    Ok(
+      self
+        .pop()
+        .ok_or_else(|| RuntimeError::Unknown)?
+        .try_into()?,
+    )
   }
 
   fn peek_and_pop_as<T>(&mut self) -> InterpretResult<T>
@@ -124,8 +136,8 @@ impl VM {
         OpCode::True => self.push(Value::Boolean(true)),
         OpCode::False => self.push(Value::Boolean(false)),
         OpCode::Equal => {
-          let b = self.pop();
-          let a = self.pop();
+          let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
+          let a = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
           let value = self.values_equal(a, b);
           self.push(Value::Boolean(value));
         }
@@ -138,17 +150,19 @@ impl VM {
           self.push(Value::Boolean(value));
         }
         OpCode::Add => {
-          let b = self.peek(0).ok_or_else(|| RuntimeError::Unknown)?.clone();
-          let a = self.peek(1).ok_or_else(|| RuntimeError::Unknown)?.clone();
+          let b = self.peek(0).ok_or_else(|| RuntimeError::Unknown)?;
+          let a = self.peek(1).ok_or_else(|| RuntimeError::Unknown)?;
 
           match (a, b) {
             (Value::Number(_), Value::Number(_)) => {
               let value = binary_op!(self, f64, |a, b| a + b)?;
               self.push(Value::Number(value));
             }
-            (Value::String(a), Value::String(b)) => {
-              self.pop();
-              self.pop();
+            (Value::String(_), Value::String(_))
+            | (Value::Number(_), Value::String(_))
+            | (Value::String(_), Value::Number(_)) => {
+              let b = self.pop_as::<String>()?;
+              let a = self.pop_as::<String>()?;
               self.push(Value::String(format!("{}{}", a, b)));
             }
             _ => return Err(RuntimeError::OperationNotSupported.into()),
@@ -159,8 +173,22 @@ impl VM {
           self.push(Value::Number(value));
         }
         OpCode::Multiply => {
-          let value = binary_op!(self, f64, |a, b| a * b)?;
-          self.push(Value::Number(value));
+          let b = self.peek(0).ok_or_else(|| RuntimeError::Unknown)?;
+          let a = self.peek(1).ok_or_else(|| RuntimeError::Unknown)?;
+
+          match (a, b) {
+            (Value::Number(_), Value::Number(_)) => {
+              let value = binary_op!(self, f64, |a, b| a * b)?;
+              self.push(Value::Number(value));
+            }
+            (Value::String(_), Value::Number(_)) => {
+              let b = self.pop_as::<f64>()?;
+              let a = self.pop_as::<String>()?;
+              let value: String = repeat(a).take(b.round() as usize).collect();
+              self.push(Value::String(value));
+            }
+            _ => return Err(RuntimeError::OperationNotSupported.into()),
+          }
         }
         OpCode::Divide => {
           let value = binary_op!(self, f64, |a, b| a / b)?;
@@ -179,7 +207,7 @@ impl VM {
           self.push(Value::Number(-value));
         }
         OpCode::Return => {
-          return Ok(self.pop());
+          return Ok(self.pop().ok_or_else(|| RuntimeError::Unknown)?);
         }
       }
     }
