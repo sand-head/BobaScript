@@ -129,6 +129,7 @@ impl VM {
       }
 
       match instruction {
+        OpCode::Unit => self.push(Value::Unit),
         OpCode::Constant(idx) => {
           let constant = self.chunk.constants[*idx].clone();
           self.push(constant);

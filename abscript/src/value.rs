@@ -4,6 +4,7 @@ use crate::vm::RuntimeError;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
+  Unit,
   Number(f64),
   Boolean(bool),
   String(String),
@@ -41,20 +42,30 @@ impl TryInto<String> for Value {
   type Error = RuntimeError;
 
   fn try_into(self) -> Result<String, Self::Error> {
-    Ok(match self {
-      Value::Number(num) => format!("{}", num),
-      Value::Boolean(bool) => format!("{}", bool),
-      Value::String(str) => str,
-    })
+    match self {
+      Self::Number(num) => Ok(format!("{}", num)),
+      Self::Boolean(bool) => Ok(format!("{}", bool)),
+      Self::String(str) => Ok(str),
+      _ => Err(RuntimeError::TypeError {
+        expected: "string",
+        found: self,
+      }),
+    }
   }
 }
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let value: String = Value::try_into(self.clone()).unwrap();
     match self {
-      Self::String(_) => write!(f, "\"{}\"", value),
-      _ => write!(f, "{}", value),
+      Self::Unit => write!(f, "()"),
+      _ => {
+        let value: String = Value::try_into(self.clone()).unwrap();
+        if let Self::String(_) = self {
+          write!(f, "\"{}\"", value)
+        } else {
+          write!(f, "{}", value)
+        }
+      }
     }
   }
 }

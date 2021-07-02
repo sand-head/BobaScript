@@ -125,6 +125,7 @@ impl<'a> Compiler<'a> {
   fn literal(&mut self) {
     let previous_type = self.parser.previous.as_ref().unwrap().token_type;
     match previous_type {
+      TokenType::Unit => self.emit_opcode(OpCode::Unit),
       TokenType::False => self.emit_opcode(OpCode::False),
       TokenType::True => self.emit_opcode(OpCode::True),
       _ => unreachable!(),
@@ -191,6 +192,7 @@ fn get_rule(token_type: TokenType) -> ParseRule {
     TokenType::LessThan => parse_infix!(|c| c.binary(), Comparison),
     TokenType::LessEqual => parse_infix!(|c| c.binary(), Comparison),
 
+    TokenType::Unit => parse_prefix!(|c| c.literal(), None),
     TokenType::String => parse_prefix!(|c| c.string(), None),
     TokenType::Number => parse_prefix!(|c| c.number(), None),
 

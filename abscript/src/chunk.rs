@@ -2,6 +2,7 @@ use crate::value::Value;
 
 #[derive(Debug)]
 pub enum OpCode {
+  Unit,
   Constant(usize),
   True,
   False,
