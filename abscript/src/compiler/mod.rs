@@ -26,6 +26,8 @@ pub enum CompileError {
   UnterminatedString(usize),
   #[error("Expected {0}.")]
   Expected(&'static str),
+  #[error("Invalid assignment target.")]
+  InvalidAssignmentTarget,
 }
 
 pub struct Compiler<'a> {
@@ -44,10 +46,10 @@ impl<'a> Compiler<'a> {
     self.parser = Parser::new(source);
 
     self.parser.advance();
-    self.expression();
-    self
-      .parser
-      .consume(TokenType::EOF, CompileError::Expected("end of expression"));
+    match self.parser.current_type() {
+      Some(TokenType::EOF) => self.parser.advance(),
+      _ => self.statement(),
+    }
     self.end_compiler();
 
     match &self.parser.error {
@@ -58,28 +60,83 @@ impl<'a> Compiler<'a> {
 
   fn parse_precedence(&mut self, precedence: Precedence) {
     self.parser.advance();
-    let rule_prefix = get_rule(self.parser.previous.as_ref().unwrap().token_type).prefix;
+    let rule_prefix = get_rule(self.parser.previous_type().unwrap()).prefix;
 
+    let can_assign = precedence <= Precedence::Assignment;
     match rule_prefix {
-      Some(prefix) => prefix(self),
+      Some(prefix) => prefix(self, can_assign),
       None => self.parser.set_error(CompileError::Expected("expression")),
     }
 
-    while precedence <= get_rule(self.parser.current.as_ref().unwrap().token_type).precedence {
+    if can_assign && self.parser.current_type().unwrap() == TokenType::Assign {
       self.parser.advance();
-      let rule_infix = get_rule(self.parser.previous.as_ref().unwrap().token_type).infix;
+      self.parser.set_error(CompileError::InvalidAssignmentTarget);
+    }
+
+    while precedence <= get_rule(self.parser.current_type().unwrap()).precedence {
+      self.parser.advance();
+      let rule_infix = get_rule(self.parser.previous_type().unwrap()).infix;
       if let Some(infix) = rule_infix {
-        infix(self);
+        infix(self, can_assign);
       }
     }
+  }
+
+  fn statement(&mut self) {
+    match self.parser.current_type() {
+      Some(TokenType::Const) => {}
+      Some(TokenType::Let) => {
+        // skip past "let" token:
+        self.parser.advance();
+        self.let_statement();
+      }
+      Some(_) => {
+        self.expression();
+        self.parser.consume(
+          TokenType::Semicolon,
+          CompileError::Expected("';' after expression"),
+        );
+        self.emit_opcode(OpCode::Pop);
+      }
+      _ => unreachable!(),
+    }
+
+    if self.parser.is_panicking() {
+      self.parser.synchronize();
+    }
+  }
+
+  fn let_statement(&mut self) {
+    let global = self.parse_variable(CompileError::Expected("variable name"));
+
+    if let Some(TokenType::Assign) = self.parser.current_type() {
+      self.parser.advance();
+      self.expression();
+    } else {
+      self.emit_opcode(OpCode::Unit);
+    }
+    self.parser.consume(
+      TokenType::Semicolon,
+      CompileError::Expected("';' after let statement"),
+    );
+
+    self.define_variable(global);
   }
 
   fn expression(&mut self) {
     self.parse_precedence(Precedence::Assignment);
   }
 
+  fn grouping(&mut self) {
+    self.expression();
+    self.parser.consume(
+      TokenType::RightParen,
+      CompileError::Expected("')' after expression"),
+    );
+  }
+
   fn unary(&mut self) {
-    let unary_operator = self.parser.previous.as_ref().unwrap().token_type;
+    let unary_operator = self.parser.previous_type().unwrap();
 
     // compile the operand
     self.parse_precedence(Precedence::Unary);
@@ -93,7 +150,7 @@ impl<'a> Compiler<'a> {
   }
 
   fn binary(&mut self) {
-    let binary_operator = self.parser.previous.as_ref().unwrap().token_type;
+    let binary_operator = self.parser.previous_type().unwrap();
     let rule: usize = get_rule(binary_operator).precedence.into();
     self.parse_precedence((rule + 1).into());
 
@@ -123,25 +180,20 @@ impl<'a> Compiler<'a> {
   }
 
   fn literal(&mut self) {
-    let previous_type = self.parser.previous.as_ref().unwrap().token_type;
-    match previous_type {
-      TokenType::Unit => self.emit_opcode(OpCode::Unit),
-      TokenType::False => self.emit_opcode(OpCode::False),
-      TokenType::True => self.emit_opcode(OpCode::True),
+    match self.parser.previous_type() {
+      Some(TokenType::Unit) => self.emit_opcode(OpCode::Unit),
+      Some(TokenType::False) => self.emit_opcode(OpCode::False),
+      Some(TokenType::True) => self.emit_opcode(OpCode::True),
       _ => unreachable!(),
     }
   }
 
-  fn grouping(&mut self) {
-    self.expression();
-    self.parser.consume(
-      TokenType::RightParen,
-      CompileError::Expected("')' after expression"),
-    );
+  fn variable(&mut self, can_assign: bool) {
+    self.named_variable(self.parser.previous().unwrap().lexeme.clone(), can_assign)
   }
 
   fn string(&mut self) {
-    let string = self.parser.previous.as_ref().unwrap().lexeme.clone();
+    let string = &self.parser.previous().unwrap().lexeme;
     // strip the leading and trailing quotation mark off the lexeme:
     let string = string[1..(string.len() - 1)].to_string();
     let string_idx = self.make_constant(Value::String(string));
@@ -149,7 +201,7 @@ impl<'a> Compiler<'a> {
   }
 
   fn number(&mut self) {
-    let num = &self.parser.previous.as_ref().unwrap().lexeme;
+    let num = &self.parser.previous().unwrap().lexeme;
     let num = num.parse::<f64>().unwrap();
     let num_idx = self.make_constant(Value::Number(num));
     self.emit_opcode(OpCode::Constant(num_idx));
@@ -162,7 +214,32 @@ impl<'a> Compiler<'a> {
   fn emit_opcode(&mut self, opcode: OpCode) {
     self
       .chunk
-      .write(opcode, self.parser.previous.as_ref().unwrap().line);
+      .write(opcode, self.parser.previous().unwrap().line);
+  }
+
+  fn parse_variable(&mut self, err: CompileError) -> usize {
+    self.parser.consume(TokenType::Identifier, err);
+    self.identifier_constant(self.parser.previous().unwrap().lexeme.clone())
+  }
+
+  fn define_variable(&mut self, global: usize) {
+    self.emit_opcode(OpCode::DefineGlobal(global))
+  }
+
+  fn identifier_constant(&mut self, lexeme: String) -> usize {
+    self.make_constant(Value::String(lexeme))
+  }
+
+  fn named_variable(&mut self, lexeme: String, can_assign: bool) {
+    let idx = self.identifier_constant(lexeme);
+    if can_assign && self.parser.current_type() == Some(TokenType::Assign) {
+      // skip assign token, parse an expression, and make it this variable's value
+      self.parser.advance();
+      self.expression();
+      self.emit_opcode(OpCode::SetGlobal(idx));
+    } else {
+      self.emit_opcode(OpCode::GetGlobal(idx));
+    }
   }
 
   fn end_compiler(&mut self) {
@@ -176,28 +253,29 @@ impl<'a> Compiler<'a> {
 /// Gets the appropriate `ParseRule` for the given `TokenType`.
 fn get_rule(token_type: TokenType) -> ParseRule {
   match token_type {
-    TokenType::LeftParen => parse_prefix!(|c| c.grouping(), None),
+    TokenType::LeftParen => parse_prefix!(|c, _| c.grouping(), None),
 
-    TokenType::Asterisk => parse_infix!(|c| c.binary(), Factor),
-    TokenType::Carrot => parse_infix!(|c| c.binary(), Exponent),
-    TokenType::Minus => parse_both!(|c| c.unary(), |c| c.binary(), Term),
-    TokenType::Plus => parse_infix!(|c| c.binary(), Term),
-    TokenType::Slash => parse_infix!(|c| c.binary(), Factor),
+    TokenType::Asterisk => parse_infix!(|c, _| c.binary(), Factor),
+    TokenType::Carrot => parse_infix!(|c, _| c.binary(), Exponent),
+    TokenType::Minus => parse_both!(|c, _| c.unary(), |c, _| c.binary(), Term),
+    TokenType::Plus => parse_infix!(|c, _| c.binary(), Term),
+    TokenType::Slash => parse_infix!(|c, _| c.binary(), Factor),
 
-    TokenType::Not => parse_prefix!(|c| c.unary(), None),
-    TokenType::NotEqual => parse_infix!(|c| c.binary(), Equality),
-    TokenType::Equal => parse_infix!(|c| c.binary(), Equality),
-    TokenType::GreaterThan => parse_infix!(|c| c.binary(), Comparison),
-    TokenType::GreaterEqual => parse_infix!(|c| c.binary(), Comparison),
-    TokenType::LessThan => parse_infix!(|c| c.binary(), Comparison),
-    TokenType::LessEqual => parse_infix!(|c| c.binary(), Comparison),
+    TokenType::Not => parse_prefix!(|c, _| c.unary(), None),
+    TokenType::NotEqual => parse_infix!(|c, _| c.binary(), Equality),
+    TokenType::Equal => parse_infix!(|c, _| c.binary(), Equality),
+    TokenType::GreaterThan => parse_infix!(|c, _| c.binary(), Comparison),
+    TokenType::GreaterEqual => parse_infix!(|c, _| c.binary(), Comparison),
+    TokenType::LessThan => parse_infix!(|c, _| c.binary(), Comparison),
+    TokenType::LessEqual => parse_infix!(|c, _| c.binary(), Comparison),
 
-    TokenType::Unit => parse_prefix!(|c| c.literal(), None),
-    TokenType::String => parse_prefix!(|c| c.string(), None),
-    TokenType::Number => parse_prefix!(|c| c.number(), None),
+    TokenType::Unit => parse_prefix!(|c, _| c.literal(), None),
+    TokenType::Identifier => parse_prefix!(|c, can_assign| c.variable(can_assign), None),
+    TokenType::String => parse_prefix!(|c, _| c.string(), None),
+    TokenType::Number => parse_prefix!(|c, _| c.number(), None),
 
-    TokenType::False => parse_prefix!(|c| c.literal(), None),
-    TokenType::True => parse_prefix!(|c| c.literal(), None),
+    TokenType::False => parse_prefix!(|c, _| c.literal(), None),
+    TokenType::True => parse_prefix!(|c, _| c.literal(), None),
 
     _ => parse_none!(),
   }

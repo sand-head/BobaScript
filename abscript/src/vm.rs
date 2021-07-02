@@ -1,4 +1,4 @@
-use std::{convert::TryInto, iter::repeat};
+use std::{collections::HashMap, convert::TryInto, iter::repeat};
 
 use thiserror::Error;
 
@@ -30,12 +30,15 @@ pub enum RuntimeError {
   },
   #[error("The attempted operation is not supported.")]
   OperationNotSupported,
+  #[error("Undefined variable \"{0}\".")]
+  UndefinedVariable(String),
 }
 
 pub struct VM {
   chunk: Chunk,
   ip: usize,
   stack: Vec<Value>,
+  globals: HashMap<String, Value>,
 }
 impl VM {
   pub fn new() -> Self {
@@ -43,6 +46,7 @@ impl VM {
       chunk: Chunk::default(),
       ip: 0,
       stack: Vec::with_capacity(256),
+      globals: HashMap::new(),
     }
   }
 
@@ -136,6 +140,37 @@ impl VM {
         }
         OpCode::True => self.push(Value::Boolean(true)),
         OpCode::False => self.push(Value::Boolean(false)),
+        OpCode::Pop => {
+          self.pop();
+        }
+        OpCode::DefineGlobal(global) => {
+          let global = self.chunk.constants[*global].clone();
+          let name: String = global.try_into()?;
+          self.globals.insert(name, self.peek(0).unwrap().clone());
+          self.pop();
+        }
+        OpCode::GetGlobal(global) => {
+          let global = self.chunk.constants[*global].clone();
+          let name: String = global.try_into()?;
+
+          let value = self
+            .globals
+            .get(&name)
+            .ok_or_else(|| RuntimeError::UndefinedVariable(name))?
+            .clone();
+
+          self.push(value);
+        }
+        OpCode::SetGlobal(global) => {
+          let global = self.chunk.constants[*global].clone();
+          let name: String = global.try_into()?;
+          let new_value = self.peek(0).unwrap().clone();
+
+          *self
+            .globals
+            .get_mut(&name)
+            .ok_or_else(|| RuntimeError::UndefinedVariable(name))? = new_value;
+        }
         OpCode::Equal => {
           let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
           let a = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
@@ -208,7 +243,7 @@ impl VM {
           self.push(Value::Number(-value));
         }
         OpCode::Return => {
-          return Ok(self.pop().ok_or_else(|| RuntimeError::Unknown)?);
+          return Ok(Value::Unit);
         }
       }
     }

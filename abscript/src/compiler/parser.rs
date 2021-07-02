@@ -5,8 +5,8 @@ use super::{
 
 pub struct Parser {
   scanner: Scanner,
-  pub current: Option<Token>,
-  pub previous: Option<Token>,
+  current: Option<Token>,
+  previous: Option<Token>,
   pub error: Option<CompileError>,
   panic_mode: bool,
 }
@@ -19,6 +19,22 @@ impl Parser {
       error: None,
       panic_mode: false,
     }
+  }
+
+  pub fn current(&self) -> Option<&Token> {
+    self.current.as_ref()
+  }
+
+  pub fn previous(&self) -> Option<&Token> {
+    self.previous.as_ref()
+  }
+
+  pub fn current_type(&self) -> Option<TokenType> {
+    self.current.as_ref().map(|c| c.token_type)
+  }
+
+  pub fn previous_type(&self) -> Option<TokenType> {
+    self.previous.as_ref().map(|p| p.token_type)
   }
 
   pub fn advance(&mut self) {
@@ -41,8 +57,8 @@ impl Parser {
   }
 
   pub fn consume(&mut self, token_type: TokenType, err: CompileError) {
-    if let Some(token) = &self.current {
-      if token.token_type == token_type {
+    if let Some(current_type) = self.current_type() {
+      if current_type == token_type {
         return self.advance();
       }
     }
@@ -54,6 +70,40 @@ impl Parser {
     if !self.panic_mode {
       self.panic_mode = true;
       self.error = Some(err);
+    }
+  }
+
+  pub fn is_panicking(&self) -> bool {
+    self.panic_mode
+  }
+
+  pub fn synchronize(&mut self) {
+    self.panic_mode = false;
+
+    loop {
+      // if we're at the end of a statement, we're synched
+      if let Some(TokenType::Semicolon) = self.previous_type() {
+        return;
+      }
+
+      // also, if we're at the *start* of a statement, we're synched
+      match self.current_type() {
+        Some(
+          TokenType::EOF
+          | TokenType::Class
+          | TokenType::Let
+          | TokenType::Const
+          | TokenType::For
+          | TokenType::If
+          | TokenType::While
+          | TokenType::Return
+          | TokenType::Break,
+        ) => return,
+        _ => (),
+      }
+
+      // not synched yet!
+      self.advance();
     }
   }
 }

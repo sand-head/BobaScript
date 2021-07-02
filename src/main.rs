@@ -1,6 +1,6 @@
 use std::io::{self, stdin, stdout, Write};
 
-use abscript::{vm::VM, InterpretError, InterpretResult};
+use abscript::{value::Value, vm::VM, InterpretError, InterpretResult};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 fn main() -> InterpretResult<()> {
@@ -16,6 +16,7 @@ fn main() -> InterpretResult<()> {
       .expect("Could not read input from console");
 
     match vm.interpret(input) {
+      Ok(Value::Unit) => (),
       Ok(value) => println!("< {}", value),
       Err(err) => print_error(err).map_err(|_| InterpretError::Unknown)?,
     }

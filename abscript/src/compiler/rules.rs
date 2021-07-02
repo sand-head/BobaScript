@@ -64,7 +64,7 @@ pub enum Precedence {
   Primary,
 }
 
-type ParseFn = fn(&mut Compiler) -> ();
+type ParseFn = fn(&mut Compiler, bool) -> ();
 pub struct ParseRule {
   pub prefix: Option<ParseFn>,
   pub infix: Option<ParseFn>,
