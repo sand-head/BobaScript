@@ -122,6 +122,11 @@ impl<'a> Compiler<'a> {
         self.block();
         self.end_scope();
       }
+      Some(TokenType::If) => {
+        // todo: also make ifs expressions instead of statements
+        self.parser.advance();
+        self.if_statement();
+      }
       Some(_) => {
         self.expression();
         self.parser.consume(
@@ -179,6 +184,21 @@ impl<'a> Compiler<'a> {
       TokenType::RightBrace,
       CompileError::Expected("'}' after block"),
     );
+  }
+
+  fn if_statement(&mut self) {
+    self.expression();
+    let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+
+    self.parser.consume(
+      TokenType::LeftBrace,
+      CompileError::Expected("block after if statement"),
+    );
+    self.begin_scope();
+    self.block();
+    self.end_scope();
+
+    self.patch_jump(then_jump);
   }
 
   fn unary(&mut self) {
@@ -261,6 +281,24 @@ impl<'a> Compiler<'a> {
     self
       .chunk
       .write(opcode, self.parser.previous().unwrap().line);
+  }
+
+  fn emit_jump(&mut self, opcode: OpCode) -> usize {
+    self
+      .chunk
+      .write(opcode, self.parser.previous().unwrap().line)
+  }
+
+  fn patch_jump(&mut self, offset: usize) {
+    let new_jump = self.chunk.code.len() - 1 - offset;
+    let (opcode, line) = &self.chunk.code[offset];
+    self.chunk.code[offset] = (
+      match opcode {
+        OpCode::JumpIfFalse(_) => OpCode::JumpIfFalse(new_jump),
+        _ => unreachable!(),
+      },
+      *line,
+    );
   }
 
   fn begin_scope(&mut self) {

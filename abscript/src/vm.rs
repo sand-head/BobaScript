@@ -258,6 +258,12 @@ impl VM {
           let value = self.pop().unwrap();
           println!("{}", value);
         }
+        OpCode::JumpIfFalse(jump) => {
+          let condition: bool = self.peek(0).unwrap().clone().try_into().unwrap();
+          if !condition {
+            self.ip += jump;
+          }
+        }
         OpCode::Return => {
           return Ok(Value::Unit);
         }

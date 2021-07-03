@@ -24,6 +24,7 @@ pub enum OpCode {
   Not,
   Negate,
   Log,
+  JumpIfFalse(usize),
   Return,
 }
 
@@ -41,8 +42,9 @@ impl Default for Chunk {
 }
 
 impl Chunk {
-  pub fn write(&mut self, opcode: OpCode, line: usize) {
-    self.code.push((opcode, line))
+  pub fn write(&mut self, opcode: OpCode, line: usize) -> usize {
+    self.code.push((opcode, line));
+    self.code.len() - 1
   }
 
   pub fn add_constant(&mut self, value: Value) -> usize {
