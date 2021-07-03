@@ -8,6 +8,8 @@ pub enum OpCode {
   False,
   Pop,
   DefineGlobal(usize),
+  GetLocal(usize),
+  SetLocal(usize),
   GetGlobal(usize),
   SetGlobal(usize),
   Equal,
@@ -20,6 +22,7 @@ pub enum OpCode {
   Exponent,
   Not,
   Negate,
+  Log,
   Return,
 }
 

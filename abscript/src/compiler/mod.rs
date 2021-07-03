@@ -3,7 +3,7 @@ use thiserror::Error;
 use self::{
   parser::Parser,
   rules::{ParseRule, Precedence},
-  scanner::TokenType,
+  scanner::{Token, TokenType},
 };
 use crate::{
   chunk::{Chunk, OpCode},
@@ -18,7 +18,7 @@ mod scanner;
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
-#[derive(Debug, Error, Clone, Copy)]
+#[derive(Debug, Error, Clone)]
 pub enum CompileError {
   #[error("Unexpected character '{1}' on line {0}.")]
   UnexpectedCharacter(usize, char),
@@ -28,17 +28,31 @@ pub enum CompileError {
   Expected(&'static str),
   #[error("Invalid assignment target.")]
   InvalidAssignmentTarget,
+  #[error("A variable with the name \"{0}\" already exists in this scope.")]
+  VariableAlreadyExists(String),
+  #[error("A variable with the name \"{0}\" does not exist in scope.")]
+  VariableDoesNotExist(String),
+}
+
+struct Local {
+  name: Token,
+  // todo: change this so we don't use -1 for uninitialized locals
+  depth: i32,
 }
 
 pub struct Compiler<'a> {
   parser: Parser,
   chunk: &'a mut Chunk,
+  locals: Vec<Local>,
+  scope_depth: i32,
 }
 impl<'a> Compiler<'a> {
   pub fn new(chunk: &'a mut Chunk) -> Self {
     Self {
       parser: Parser::new(String::from("")),
       chunk,
+      locals: Vec::new(),
+      scope_depth: 0,
     }
   }
 
@@ -54,7 +68,7 @@ impl<'a> Compiler<'a> {
 
     match &self.parser.error {
       None => Ok(()),
-      Some(err) => Err(*err),
+      Some(err) => Err(err.clone()),
     }
   }
 
@@ -84,11 +98,29 @@ impl<'a> Compiler<'a> {
 
   fn statement(&mut self) {
     match self.parser.current_type() {
-      Some(TokenType::Const) => {}
+      Some(TokenType::Log) => {
+        self.parser.advance();
+        self.expression();
+        self.parser.consume(
+          TokenType::Semicolon,
+          CompileError::Expected("';' after value"),
+        );
+        self.emit_opcode(OpCode::Log);
+      }
+      Some(TokenType::Const) => {
+        todo!("add const statement")
+      }
       Some(TokenType::Let) => {
         // skip past "let" token:
         self.parser.advance();
         self.let_statement();
+      }
+      Some(TokenType::LeftBrace) => {
+        // todo: make blocks expressions instead of statements
+        self.parser.advance();
+        self.begin_scope();
+        self.block();
+        self.end_scope();
       }
       Some(_) => {
         self.expression();
@@ -132,6 +164,20 @@ impl<'a> Compiler<'a> {
     self.parser.consume(
       TokenType::RightParen,
       CompileError::Expected("')' after expression"),
+    );
+  }
+
+  fn block(&mut self) {
+    loop {
+      match self.parser.current_type().unwrap() {
+        TokenType::RightBrace | TokenType::EOF => break,
+        _ => self.statement(),
+      }
+    }
+
+    self.parser.consume(
+      TokenType::RightBrace,
+      CompileError::Expected("'}' after block"),
     );
   }
 
@@ -217,28 +263,101 @@ impl<'a> Compiler<'a> {
       .write(opcode, self.parser.previous().unwrap().line);
   }
 
-  fn parse_variable(&mut self, err: CompileError) -> usize {
-    self.parser.consume(TokenType::Identifier, err);
-    self.identifier_constant(self.parser.previous().unwrap().lexeme.clone())
+  fn begin_scope(&mut self) {
+    self.scope_depth += 1;
   }
 
+  fn end_scope(&mut self) {
+    self.scope_depth -= 1;
+
+    if self.locals.len() > 0 {
+      for i in (self.locals.len() - 1)..0 {
+        if self.locals[i].depth > self.scope_depth {
+          self.emit_opcode(OpCode::Pop);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  fn parse_variable(&mut self, err: CompileError) -> usize {
+    self.parser.consume(TokenType::Identifier, err);
+    self.declare_variable();
+
+    if self.scope_depth > 0 {
+      0
+    } else {
+      self.identifier_constant(self.parser.previous().unwrap().lexeme.clone())
+    }
+  }
+
+  fn mark_initialized(&mut self) {
+    let idx = self.locals.len() - 1;
+    self.locals[idx].depth = self.scope_depth;
+  }
+
+  /// Initializes a variable in the scope for use
   fn define_variable(&mut self, global: usize) {
-    self.emit_opcode(OpCode::DefineGlobal(global))
+    if self.scope_depth > 0 {
+      self.mark_initialized();
+    } else {
+      self.emit_opcode(OpCode::DefineGlobal(global));
+    }
+  }
+
+  /// Adds a variable to the scope
+  fn declare_variable(&mut self) {
+    if self.scope_depth > 0 {
+      let name = self.parser.previous().unwrap().clone();
+      for local in self.locals.iter().rev() {
+        if local.depth != -1 && local.depth < self.scope_depth {
+          break;
+        }
+        if &name.lexeme == &local.name.lexeme {
+          self
+            .parser
+            .set_error(CompileError::VariableAlreadyExists(name.lexeme.clone()));
+        }
+      }
+
+      self.locals.push(Local { name, depth: -1 });
+    }
   }
 
   fn identifier_constant(&mut self, lexeme: String) -> usize {
     self.make_constant(Value::String(lexeme))
   }
 
+  fn resolve_local(&mut self, name: &String) -> Option<usize> {
+    for i in (self.locals.len() - 1)..0 {
+      if name == &self.locals[i].name.lexeme {
+        if self.locals[i].depth == -1 {
+          self.parser.set_error(CompileError::VariableDoesNotExist(
+            self.locals[i].name.lexeme.clone(),
+          ));
+        }
+        return Some(i);
+      }
+    }
+    None
+  }
+
   fn named_variable(&mut self, lexeme: String, can_assign: bool) {
-    let idx = self.identifier_constant(lexeme);
+    let (get_op, set_op) = if let Some(idx) = self.resolve_local(&lexeme) {
+      (OpCode::GetLocal(idx), OpCode::SetLocal(idx))
+    } else {
+      let idx = self.identifier_constant(lexeme);
+      (OpCode::GetGlobal(idx), OpCode::SetGlobal(idx))
+    };
+
     if can_assign && self.parser.current_type() == Some(TokenType::Assign) {
       // skip assign token, parse an expression, and make it this variable's value
       self.parser.advance();
       self.expression();
-      self.emit_opcode(OpCode::SetGlobal(idx));
+      self.emit_opcode(set_op);
     } else {
-      self.emit_opcode(OpCode::GetGlobal(idx));
+      self.emit_opcode(get_op);
     }
   }
 

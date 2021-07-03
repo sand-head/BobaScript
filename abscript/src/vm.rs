@@ -149,6 +149,13 @@ impl VM {
           self.globals.insert(name, self.peek(0).unwrap().clone());
           self.pop();
         }
+        OpCode::GetLocal(local) => {
+          let local = self.stack[*local].clone();
+          self.push(local);
+        }
+        OpCode::SetLocal(local) => {
+          self.stack[*local] = self.peek(0).unwrap().clone();
+        }
         OpCode::GetGlobal(global) => {
           let global = self.chunk.constants[*global].clone();
           let name: String = global.try_into()?;
@@ -241,6 +248,10 @@ impl VM {
         OpCode::Negate => {
           let value = self.peek_and_pop_as::<f64>()?;
           self.push(Value::Number(-value));
+        }
+        OpCode::Log => {
+          let value = self.pop().unwrap();
+          println!("{}", value);
         }
         OpCode::Return => {
           return Ok(Value::Unit);
