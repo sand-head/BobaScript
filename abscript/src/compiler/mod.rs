@@ -270,13 +270,11 @@ impl<'a> Compiler<'a> {
   fn end_scope(&mut self) {
     self.scope_depth -= 1;
 
-    if self.locals.len() > 0 {
-      for i in (self.locals.len() - 1)..0 {
-        if self.locals[i].depth > self.scope_depth {
-          self.emit_opcode(OpCode::Pop);
-        } else {
-          break;
-        }
+    for i in (0..self.locals.len()).rev() {
+      if self.locals[i].depth > self.scope_depth {
+        self.emit_opcode(OpCode::Pop);
+      } else {
+        break;
       }
     }
   }
@@ -330,7 +328,7 @@ impl<'a> Compiler<'a> {
   }
 
   fn resolve_local(&mut self, name: &String) -> Option<usize> {
-    for i in (self.locals.len() - 1)..0 {
+    for i in (0..self.locals.len()).rev() {
       if name == &self.locals[i].name.lexeme {
         if self.locals[i].depth == -1 {
           self.parser.set_error(CompileError::VariableDoesNotExist(
