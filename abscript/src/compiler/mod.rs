@@ -189,6 +189,7 @@ impl<'a> Compiler<'a> {
   fn if_statement(&mut self) {
     self.expression();
     let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+    self.emit_opcode(OpCode::Pop);
 
     self.parser.consume(
       TokenType::LeftBrace,
@@ -198,7 +199,23 @@ impl<'a> Compiler<'a> {
     self.block();
     self.end_scope();
 
+    let else_jump = self.emit_jump(OpCode::Jump(0));
     self.patch_jump(then_jump);
+    self.emit_opcode(OpCode::Pop);
+
+    if self.parser.current_type() == Some(TokenType::Else) {
+      self.parser.advance();
+      // todo: check for "if" keyword, for else ifs
+      self.parser.consume(
+        TokenType::LeftBrace,
+        CompileError::Expected("block after else statement"),
+      );
+      self.begin_scope();
+      self.block();
+      self.end_scope();
+    }
+
+    self.patch_jump(else_jump);
   }
 
   fn unary(&mut self) {
@@ -294,6 +311,7 @@ impl<'a> Compiler<'a> {
     let (opcode, line) = &self.chunk.code[offset];
     self.chunk.code[offset] = (
       match opcode {
+        OpCode::Jump(_) => OpCode::Jump(new_jump),
         OpCode::JumpIfFalse(_) => OpCode::JumpIfFalse(new_jump),
         _ => unreachable!(),
       },

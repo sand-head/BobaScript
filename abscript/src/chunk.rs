@@ -24,6 +24,7 @@ pub enum OpCode {
   Not,
   Negate,
   Log,
+  Jump(usize),
   JumpIfFalse(usize),
   Return,
 }
