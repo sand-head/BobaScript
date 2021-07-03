@@ -270,12 +270,19 @@ impl<'a> Compiler<'a> {
   fn end_scope(&mut self) {
     self.scope_depth -= 1;
 
+    let mut count: usize = 0;
     for i in (0..self.locals.len()).rev() {
       if self.locals[i].depth > self.scope_depth {
-        self.emit_opcode(OpCode::Pop);
+        self.locals.remove(i);
+        count += 1;
       } else {
         break;
       }
+    }
+    if count == 1 {
+      self.emit_opcode(OpCode::Pop);
+    } else if count > 1 {
+      self.emit_opcode(OpCode::PopN(count));
     }
   }
 

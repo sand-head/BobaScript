@@ -143,6 +143,11 @@ impl VM {
         OpCode::Pop => {
           self.pop();
         }
+        OpCode::PopN(count) => {
+          for _ in 0..*count {
+            self.pop();
+          }
+        }
         OpCode::DefineGlobal(global) => {
           let global = self.chunk.constants[*global].clone();
           let name: String = global.try_into()?;

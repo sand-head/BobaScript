@@ -7,6 +7,7 @@ pub enum OpCode {
   True,
   False,
   Pop,
+  PopN(usize),
   DefineGlobal(usize),
   GetLocal(usize),
   SetLocal(usize),
