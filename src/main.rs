@@ -1,4 +1,7 @@
-use std::io::{self, Write};
+use std::{
+  convert::TryInto,
+  io::{self, Write},
+};
 
 use abscript::{value::Value, vm::VM, InterpretError, InterpretResult};
 use rustyline::{
@@ -20,6 +23,11 @@ impl Validator for InputValidator {
   }
 }
 
+fn log_handler(value: Value) {
+  let value: String = value.try_into().unwrap();
+  println!("# {}", value);
+}
+
 fn main() -> InterpretResult<()> {
   // set up editor
   let helper = InputValidator {
@@ -30,15 +38,19 @@ fn main() -> InterpretResult<()> {
 
   // create our virtual machine
   let mut vm = VM::new();
+  vm.add_log_handler(&log_handler);
 
   println!("Howdy! Welcome to the ABScript REPL, enjoy your stay.");
   loop {
     match rl.readline("> ") {
-      Ok(input) => match vm.interpret(input) {
-        Ok(Value::Unit) => (),
-        Ok(value) => println!("< {}", value),
-        Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
-      },
+      Ok(input) => {
+        rl.add_history_entry(&input);
+        match vm.interpret(input) {
+          Ok(Value::Unit) => {}
+          Ok(value) => println!("< {}", value),
+          Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
+        }
+      }
       Err(ReadlineError::Interrupted) => {
         println!("Stopping REPL...");
         break Ok(());

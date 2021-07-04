@@ -34,20 +34,26 @@ pub enum RuntimeError {
   UndefinedVariable(String),
 }
 
-pub struct VM {
+pub struct VM<'a> {
+  log_handler: Option<&'a dyn Fn(Value) -> ()>,
   chunk: Chunk,
   ip: usize,
   stack: Vec<Value>,
   globals: HashMap<String, Value>,
 }
-impl VM {
+impl<'a> VM<'a> {
   pub fn new() -> Self {
     Self {
+      log_handler: None,
       chunk: Chunk::default(),
       ip: 0,
       stack: Vec::with_capacity(256),
       globals: HashMap::new(),
     }
+  }
+
+  pub fn add_log_handler(&mut self, handler: &'a dyn Fn(Value) -> ()) {
+    self.log_handler = Some(handler);
   }
 
   pub fn interpret<S>(&mut self, source: S) -> InterpretResult<Value>
@@ -256,7 +262,11 @@ impl VM {
         }
         OpCode::Log => {
           let value = self.pop().unwrap();
-          println!("{}", value);
+          if let Some(handler) = self.log_handler {
+            handler(value);
+          } else {
+            println!("{}", value);
+          }
         }
         OpCode::Jump(jump) => {
           self.ip += jump;
