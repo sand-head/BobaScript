@@ -119,7 +119,6 @@ impl<'a> Compiler<'a> {
         self.expression();
         let previous_type = self.parser.previous_type();
         let current_type = self.parser.current_type();
-        println!("previous, current: {:?} {:?}", previous_type, current_type);
 
         match (previous_type, current_type) {
           (_, Some(TokenType::RightBrace)) if self.scope_depth > 0 => {

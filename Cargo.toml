@@ -14,3 +14,5 @@ members = [
 [dependencies]
 abscript = { path = "abscript", features = ["debug"] }
 termcolor = "1.1"
+rustyline = "8.2"
+rustyline-derive = "0.4"
