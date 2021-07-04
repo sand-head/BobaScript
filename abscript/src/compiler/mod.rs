@@ -479,13 +479,46 @@ impl<'a> Compiler<'a> {
       (OpCode::GetGlobal(idx), OpCode::SetGlobal(idx))
     };
 
-    if can_assign && self.parser.current_type() == Some(TokenType::Assign) {
-      // skip assign token, parse an expression, and make it this variable's value
-      self.parser.advance();
-      self.expression();
-      self.emit_opcode(set_op);
-    } else {
-      self.emit_opcode(get_op);
+    match self.parser.current_type() {
+      Some(TokenType::Assign) if can_assign => {
+        // skip assign token, parse an expression, and make it this variable's value
+        self.parser.advance();
+        self.expression();
+        self.emit_opcode(set_op);
+      }
+      Some(TokenType::AddAssign) if can_assign => {
+        // skip assign token, parse an expression, and make it this variable's value
+        self.parser.advance();
+        self.emit_opcode(get_op);
+        self.expression();
+        self.emit_opcode(OpCode::Add);
+        self.emit_opcode(set_op);
+      }
+      Some(TokenType::SubtractAssign) if can_assign => {
+        // skip assign token, parse an expression, and make it this variable's value
+        self.parser.advance();
+        self.emit_opcode(get_op);
+        self.expression();
+        self.emit_opcode(OpCode::Subtract);
+        self.emit_opcode(set_op);
+      }
+      Some(TokenType::MultiplyAssign) if can_assign => {
+        // skip assign token, parse an expression, and make it this variable's value
+        self.parser.advance();
+        self.emit_opcode(get_op);
+        self.expression();
+        self.emit_opcode(OpCode::Multiply);
+        self.emit_opcode(set_op);
+      }
+      Some(TokenType::DivideAssign) if can_assign => {
+        // skip assign token, parse an expression, and make it this variable's value
+        self.parser.advance();
+        self.emit_opcode(get_op);
+        self.expression();
+        self.emit_opcode(OpCode::Divide);
+        self.emit_opcode(set_op);
+      }
+      _ => self.emit_opcode(get_op),
     }
   }
 

@@ -30,6 +30,10 @@ pub enum TokenType {
   NotEqual,
   Equal,
   Assign,
+  AddAssign,
+  SubtractAssign,
+  MultiplyAssign,
+  DivideAssign,
   GreaterThan,
   GreaterEqual,
   LessThan,
@@ -103,15 +107,31 @@ impl Scanner {
       '}' => Ok(self.make_token(TokenType::RightBrace)),
       '[' => Ok(self.make_token(TokenType::LeftBracket)),
       ']' => Ok(self.make_token(TokenType::RightBracket)),
-      '*' => Ok(self.make_token(TokenType::Asterisk)),
+      '*' => Ok(if self.current_matches('=') {
+        self.make_token(TokenType::MultiplyAssign)
+      } else {
+        self.make_token(TokenType::Asterisk)
+      }),
       '^' => Ok(self.make_token(TokenType::Carrot)),
       ',' => Ok(self.make_token(TokenType::Comma)),
       '$' => Ok(self.make_token(TokenType::DollarSign)),
-      '-' => Ok(self.make_token(TokenType::Minus)),
+      '-' => Ok(if self.current_matches('=') {
+        self.make_token(TokenType::SubtractAssign)
+      } else {
+        self.make_token(TokenType::Minus)
+      }),
       '.' => Ok(self.make_token(TokenType::Period)),
-      '+' => Ok(self.make_token(TokenType::Plus)),
+      '+' => Ok(if self.current_matches('=') {
+        self.make_token(TokenType::AddAssign)
+      } else {
+        self.make_token(TokenType::Plus)
+      }),
       ';' => Ok(self.make_token(TokenType::Semicolon)),
-      '/' => Ok(self.make_token(TokenType::Slash)),
+      '/' => Ok(if self.current_matches('=') {
+        self.make_token(TokenType::DivideAssign)
+      } else {
+        self.make_token(TokenType::Slash)
+      }),
       '!' => Ok(if self.current_matches('=') {
         self.make_token(TokenType::NotEqual)
       } else {
