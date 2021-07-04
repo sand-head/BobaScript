@@ -24,8 +24,8 @@ impl Validator for InputValidator {
 }
 
 fn log_handler(value: Value) {
-  let value: String = value.try_into().unwrap();
-  println!("# {}", value);
+  let output: String = value.try_into().unwrap();
+  println!("# {}", output);
 }
 
 fn main() -> InterpretResult<()> {

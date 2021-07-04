@@ -268,14 +268,17 @@ impl<'a> VM<'a> {
             println!("{}", value);
           }
         }
-        OpCode::Jump(jump) => {
-          self.ip += jump;
+        OpCode::Jump(offset) => {
+          self.ip += offset;
         }
-        OpCode::JumpIfFalse(jump) => {
+        OpCode::JumpIfFalse(offset) => {
           let condition: bool = self.peek(0).unwrap().clone().try_into().unwrap();
           if !condition {
-            self.ip += jump;
+            self.ip += offset;
           }
+        }
+        OpCode::Loop(offset) => {
+          self.ip -= offset;
         }
         OpCode::Return => {
           return Ok(Value::Unit);

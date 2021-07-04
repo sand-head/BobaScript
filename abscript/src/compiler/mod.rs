@@ -207,18 +207,38 @@ impl<'a> Compiler<'a> {
     self.end_scope();
   }
 
+  fn and(&mut self) {
+    let end_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+
+    self.emit_opcode(OpCode::Pop);
+    self.parse_precedence(Precedence::And);
+
+    self.patch_jump(end_jump);
+  }
+
+  fn or(&mut self) {
+    let else_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+    let end_jump = self.emit_opcode_idx(OpCode::Jump(0));
+
+    self.patch_jump(else_jump);
+    self.emit_opcode(OpCode::Pop);
+
+    self.parse_precedence(Precedence::Or);
+    self.patch_jump(end_jump);
+  }
+
   fn if_expression(&mut self) {
     self.expression();
-    let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+    let then_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
     self.emit_opcode(OpCode::Pop);
 
     self.parser.consume(
       TokenType::LeftBrace,
-      CompileError::Expected("block after if statement"),
+      CompileError::Expected("block after \"if\" expression"),
     );
     self.block();
 
-    let else_jump = self.emit_jump(OpCode::Jump(0));
+    let else_jump = self.emit_opcode_idx(OpCode::Jump(0));
     self.patch_jump(then_jump);
     self.emit_opcode(OpCode::Pop);
 
@@ -227,12 +247,39 @@ impl<'a> Compiler<'a> {
       // todo: check for "if" keyword, for else ifs
       self.parser.consume(
         TokenType::LeftBrace,
-        CompileError::Expected("block after else statement"),
+        CompileError::Expected("block after \"else\" clause"),
       );
       self.block();
     }
 
     self.patch_jump(else_jump);
+  }
+
+  fn while_expression(&mut self) {
+    let loop_start = self.chunk.code.len();
+    self.expression();
+
+    let exit_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+    self.emit_opcode(OpCode::Pop);
+
+    self.parser.consume(
+      TokenType::LeftBrace,
+      CompileError::Expected("block after \"while\" loop"),
+    );
+    self.block();
+    // since this lang uses rust-like loops and blocks and things,
+    // we have to acknowledge that, as much as I may enjoy the trailing expressions in blocks,
+    // they cannot exist here, in while loops
+    // therefore, we must reject every value from the block
+    self.emit_opcode(OpCode::Pop);
+    self.emit_loop(loop_start);
+
+    self.patch_jump(exit_jump);
+    self.emit_opcode(OpCode::Pop);
+
+    // ...however, since this *is* still an expression, it must return *something*
+    let idx = self.make_constant(Value::Unit);
+    self.emit_opcode(OpCode::Constant(idx));
   }
 
   fn unary(&mut self) {
@@ -317,10 +364,17 @@ impl<'a> Compiler<'a> {
       .write(opcode, self.parser.previous().unwrap().line);
   }
 
-  fn emit_jump(&mut self, opcode: OpCode) -> usize {
+  /// Emits the given `OpCode` and returns its index in the chunk.
+  fn emit_opcode_idx(&mut self, opcode: OpCode) -> usize {
     self
       .chunk
       .write(opcode, self.parser.previous().unwrap().line)
+  }
+
+  fn emit_loop(&mut self, start: usize) {
+    // todo: investigate consolidating Jump and Loop
+    let offset = self.chunk.code.len() - start + 1;
+    self.emit_opcode(OpCode::Loop(offset));
   }
 
   fn patch_jump(&mut self, offset: usize) {
@@ -441,7 +495,9 @@ impl<'a> Compiler<'a> {
 
   fn end_compiler(&mut self) {
     self.emit_opcode(OpCode::Return);
-    if crate::DEBUG && self.parser.error.is_none() {
+    if crate::DEBUG
+    /* && self.parser.error.is_none() */
+    {
       disassemble_chunk(self.chunk, "code");
     }
   }
@@ -472,9 +528,12 @@ fn get_rule(token_type: TokenType) -> ParseRule {
     TokenType::String => parse_prefix!(|c, _| c.string(), None),
     TokenType::Number => parse_prefix!(|c, _| c.number(), None),
 
+    TokenType::And => parse_infix!(|c, _| c.and(), And),
     TokenType::False => parse_prefix!(|c, _| c.literal(), None),
     TokenType::If => parse_prefix!(|c, _| c.if_expression(), None),
+    TokenType::Or => parse_infix!(|c, _| c.or(), Or),
     TokenType::True => parse_prefix!(|c, _| c.literal(), None),
+    TokenType::While => parse_prefix!(|c, _| c.while_expression(), None),
 
     _ => parse_none!(),
   }

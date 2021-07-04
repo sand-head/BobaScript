@@ -26,6 +26,7 @@ pub enum OpCode {
   Log,
   Jump(usize),
   JumpIfFalse(usize),
+  Loop(usize),
   Return,
 }
 
