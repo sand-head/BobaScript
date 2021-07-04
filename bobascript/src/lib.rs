@@ -19,16 +19,20 @@ pub type InterpretResult<T> = Result<T, InterpretError>;
 pub enum InterpretError {
   #[error("An unknown error has occurred.")]
   Unknown,
-  #[error("Compile error: {0}")]
+  #[error("An error occurred during compilation:\n{0}")]
   CompileError(#[from] CompileError),
-  #[error("Runtime error: {0}")]
+  #[error("An error occurred during execution:\n{0}")]
   RuntimeError(#[from] RuntimeError),
 }
 
 #[cfg(test)]
 mod tests {
+  use crate::vm::VM;
+
   #[test]
-  fn it_works() {
-    assert_eq!(2 + 2, 4);
+  fn no_type_error_when_concat_string_and_block_expr() {
+    let mut vm = VM::new();
+    let result = vm.interpret("let test = \"1\" + { let test2 = 15; test2 / 3 };");
+    assert!(result.is_ok());
   }
 }
