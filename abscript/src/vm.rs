@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto, iter::repeat};
 use thiserror::Error;
 
 use crate::{
-  chunk::{Chunk, OpCode},
+  chunk::{Chunk, JumpDirection, OpCode},
   compiler::Compiler,
   debug::disassemble_instruction,
   value::Value,
@@ -268,17 +268,15 @@ impl<'a> VM<'a> {
             println!("{}", value);
           }
         }
-        OpCode::Jump(offset) => {
-          self.ip += offset;
-        }
+        OpCode::Jump(direction, offset) => match direction {
+          JumpDirection::Forwards => self.ip += offset,
+          JumpDirection::Backwards => self.ip -= offset,
+        },
         OpCode::JumpIfFalse(offset) => {
           let condition: bool = self.peek(0).unwrap().clone().try_into().unwrap();
           if !condition {
             self.ip += offset;
           }
-        }
-        OpCode::Loop(offset) => {
-          self.ip -= offset;
         }
         OpCode::Return => {
           return Ok(Value::Unit);

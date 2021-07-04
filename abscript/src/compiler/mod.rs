@@ -6,7 +6,7 @@ use self::{
   scanner::{Token, TokenType},
 };
 use crate::{
-  chunk::{Chunk, OpCode},
+  chunk::{Chunk, JumpDirection, OpCode},
   debug::disassemble_chunk,
   parse_both, parse_infix, parse_none, parse_prefix,
   value::Value,
@@ -214,7 +214,7 @@ impl<'a> Compiler<'a> {
 
   fn or(&mut self) {
     let else_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
-    let end_jump = self.emit_opcode_idx(OpCode::Jump(0));
+    let end_jump = self.emit_opcode_idx(OpCode::Jump(JumpDirection::Forwards, 0));
 
     self.patch_jump(else_jump);
     self.emit_opcode(OpCode::Pop);
@@ -234,7 +234,7 @@ impl<'a> Compiler<'a> {
     );
     self.block();
 
-    let else_jump = self.emit_opcode_idx(OpCode::Jump(0));
+    let else_jump = self.emit_opcode_idx(OpCode::Jump(JumpDirection::Forwards, 0));
     self.patch_jump(then_jump);
     self.emit_opcode(OpCode::Pop);
 
@@ -367,10 +367,10 @@ impl<'a> Compiler<'a> {
       .write(opcode, self.parser.previous().unwrap().line)
   }
 
+  /// This just emits a `Jump` instruction, but backwards
   fn emit_loop(&mut self, start: usize) {
-    // todo: investigate consolidating Jump and Loop
     let offset = self.chunk.code.len() - start + 1;
-    self.emit_opcode(OpCode::Loop(offset));
+    self.emit_opcode(OpCode::Jump(JumpDirection::Backwards, offset));
   }
 
   fn patch_jump(&mut self, offset: usize) {
@@ -378,7 +378,7 @@ impl<'a> Compiler<'a> {
     let (opcode, line) = &self.chunk.code[offset];
     self.chunk.code[offset] = (
       match opcode {
-        OpCode::Jump(_) => OpCode::Jump(new_jump),
+        OpCode::Jump(direction, _) => OpCode::Jump(*direction, new_jump),
         OpCode::JumpIfFalse(_) => OpCode::JumpIfFalse(new_jump),
         _ => unreachable!(),
       },

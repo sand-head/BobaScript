@@ -24,10 +24,15 @@ pub enum OpCode {
   Not,
   Negate,
   Log,
-  Jump(usize),
+  Jump(JumpDirection, usize),
   JumpIfFalse(usize),
-  Loop(usize),
   Return,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum JumpDirection {
+  Forwards,
+  Backwards,
 }
 
 pub struct Chunk {
