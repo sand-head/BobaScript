@@ -115,13 +115,6 @@ impl<'a> Compiler<'a> {
         self.parser.advance();
         self.let_statement();
       }
-      Some(TokenType::LeftBrace) => {
-        // todo: make blocks expressions instead of statements
-        self.parser.advance();
-        self.begin_scope();
-        self.block();
-        self.end_scope();
-      }
       Some(TokenType::If) => {
         // todo: also make ifs expressions instead of statements
         self.parser.advance();
@@ -129,14 +122,36 @@ impl<'a> Compiler<'a> {
       }
       Some(_) => {
         self.expression();
-        self.parser.consume(
-          TokenType::Semicolon,
-          CompileError::Expected("';' after expression"),
-        );
-        self.emit_opcode(OpCode::Pop);
+        match (self.parser.previous_type(), self.parser.current_type()) {
+          (_, Some(TokenType::RightBrace)) if self.scope_depth > 0 => {
+            // do nothing
+            // this allows us to use the last expression in a block in assigning new variables
+            // ex: let test = { let test2 = 15; test2 / 3 };
+          }
+          (Some(TokenType::RightBrace), _) => {
+            // also do nothing!
+            // we get here if a block has just closed
+            // we don't want to have to put semicolons after just any plain ol' block now, do we?
+            // ex: { let test = "howdy!"; log test; }
+          }
+          (_, Some(TokenType::Semicolon)) => {
+            self.parser.advance();
+            self.emit_opcode(OpCode::Pop);
+            // if this is the last statement in a block, emit a unit
+            if self.parser.current_type() == Some(TokenType::RightBrace) && self.scope_depth > 0 {
+              let idx = self.make_constant(Value::Unit);
+              self.emit_opcode(OpCode::Constant(idx));
+            }
+          }
+          _ => self
+            .parser
+            .set_error(CompileError::Expected("';' after expression")),
+        }
       }
       _ => unreachable!(),
     }
+
+    let something = {};
 
     if self.parser.is_panicking() {
       self.parser.synchronize();
@@ -173,6 +188,8 @@ impl<'a> Compiler<'a> {
   }
 
   fn block(&mut self) {
+    self.begin_scope();
+
     loop {
       match self.parser.current_type().unwrap() {
         TokenType::RightBrace | TokenType::EOF => break,
@@ -184,6 +201,8 @@ impl<'a> Compiler<'a> {
       TokenType::RightBrace,
       CompileError::Expected("'}' after block"),
     );
+
+    self.end_scope();
   }
 
   fn if_statement(&mut self) {
@@ -195,9 +214,7 @@ impl<'a> Compiler<'a> {
       TokenType::LeftBrace,
       CompileError::Expected("block after if statement"),
     );
-    self.begin_scope();
     self.block();
-    self.end_scope();
 
     let else_jump = self.emit_jump(OpCode::Jump(0));
     self.patch_jump(then_jump);
@@ -210,9 +227,7 @@ impl<'a> Compiler<'a> {
         TokenType::LeftBrace,
         CompileError::Expected("block after else statement"),
       );
-      self.begin_scope();
       self.block();
-      self.end_scope();
     }
 
     self.patch_jump(else_jump);
@@ -434,6 +449,7 @@ impl<'a> Compiler<'a> {
 fn get_rule(token_type: TokenType) -> ParseRule {
   match token_type {
     TokenType::LeftParen => parse_prefix!(|c, _| c.grouping(), None),
+    TokenType::LeftBrace => parse_prefix!(|c, _| c.block(), None),
 
     TokenType::Asterisk => parse_infix!(|c, _| c.binary(), Factor),
     TokenType::Carrot => parse_infix!(|c, _| c.binary(), Exponent),
