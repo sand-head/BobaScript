@@ -113,35 +113,32 @@ impl<'a> Compiler<'a> {
       Some(TokenType::Let) => {
         // skip past "let" token:
         self.parser.advance();
-        self.let_statement();
-      }
-      Some(TokenType::If) => {
-        // todo: also make ifs expressions instead of statements
-        self.parser.advance();
-        self.if_statement();
+        self.declaration();
       }
       Some(_) => {
         self.expression();
-        match (self.parser.previous_type(), self.parser.current_type()) {
+        let previous_type = self.parser.previous_type();
+        let current_type = self.parser.current_type();
+        println!("previous, current: {:?} {:?}", previous_type, current_type);
+
+        match (previous_type, current_type) {
           (_, Some(TokenType::RightBrace)) if self.scope_depth > 0 => {
             // do nothing
             // this allows us to use the last expression in a block in assigning new variables
             // ex: let test = { let test2 = 15; test2 / 3 };
           }
-          (Some(TokenType::RightBrace), _) => {
-            // also do nothing!
+          (Some(TokenType::RightBrace), _) if current_type != Some(TokenType::Semicolon) => {
+            // do not advance, but DO emit a pop
             // we get here if a block has just closed
             // we don't want to have to put semicolons after just any plain ol' block now, do we?
+            // however, we also don't want stray values emitted from the block in the stack
             // ex: { let test = "howdy!"; log test; }
+            self.emit_opcode(OpCode::Pop);
           }
           (_, Some(TokenType::Semicolon)) => {
+            // standard statement ending, just do the usual
             self.parser.advance();
             self.emit_opcode(OpCode::Pop);
-            // if this is the last statement in a block, emit a unit
-            if self.parser.current_type() == Some(TokenType::RightBrace) && self.scope_depth > 0 {
-              let idx = self.make_constant(Value::Unit);
-              self.emit_opcode(OpCode::Constant(idx));
-            }
           }
           _ => self
             .parser
@@ -151,14 +148,12 @@ impl<'a> Compiler<'a> {
       _ => unreachable!(),
     }
 
-    let something = {};
-
     if self.parser.is_panicking() {
       self.parser.synchronize();
     }
   }
 
-  fn let_statement(&mut self) {
+  fn declaration(&mut self) {
     let global = self.parse_variable(CompileError::Expected("variable name"));
 
     if let Some(TokenType::Assign) = self.parser.current_type() {
@@ -197,6 +192,14 @@ impl<'a> Compiler<'a> {
       }
     }
 
+    // hack: if the last statement in the block ended in a semicolon,
+    // OR if there weren't any statements and it was an empty block,
+    // emit a unit so that the expression always has a value
+    if let Some(TokenType::Semicolon | TokenType::LeftBrace) = self.parser.previous_type() {
+      let idx = self.make_constant(Value::Unit);
+      self.emit_opcode(OpCode::Constant(idx));
+    }
+
     self.parser.consume(
       TokenType::RightBrace,
       CompileError::Expected("'}' after block"),
@@ -205,7 +208,7 @@ impl<'a> Compiler<'a> {
     self.end_scope();
   }
 
-  fn if_statement(&mut self) {
+  fn if_expression(&mut self) {
     self.expression();
     let then_jump = self.emit_jump(OpCode::JumpIfFalse(0));
     self.emit_opcode(OpCode::Pop);
@@ -471,6 +474,7 @@ fn get_rule(token_type: TokenType) -> ParseRule {
     TokenType::Number => parse_prefix!(|c, _| c.number(), None),
 
     TokenType::False => parse_prefix!(|c, _| c.literal(), None),
+    TokenType::If => parse_prefix!(|c, _| c.if_expression(), None),
     TokenType::True => parse_prefix!(|c, _| c.literal(), None),
 
     _ => parse_none!(),
