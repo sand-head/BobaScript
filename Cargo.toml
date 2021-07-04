@@ -1,5 +1,5 @@
 [package]
-name = "abscript-cli"
+name = "bobascript-cli"
 version = "0.1.0"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
@@ -7,12 +7,12 @@ edition = "2018"
 [workspace]
 members = [
     ".",
-    "abscript"
+    "bobascript"
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-abscript = { path = "abscript", features = ["debug"] }
+bobascript = { path = "bobascript", features = ["debug"] }
 termcolor = "1.1"
 rustyline = "8.2"
 rustyline-derive = "0.4"

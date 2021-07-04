@@ -3,7 +3,7 @@ use std::{
   io::{self, Write},
 };
 
-use abscript::{value::Value, vm::VM, InterpretError, InterpretResult};
+use bobascript::{value::Value, vm::VM, InterpretError, InterpretResult};
 use rustyline::{
   error::ReadlineError,
   validate::{MatchingBracketValidator, ValidationContext, ValidationResult, Validator},
@@ -40,7 +40,7 @@ fn main() -> InterpretResult<()> {
   let mut vm = VM::new();
   vm.add_log_handler(&log_handler);
 
-  println!("Howdy! Welcome to the ABScript REPL, enjoy your stay.");
+  println!("Howdy! Welcome to the BobaScript REPL, enjoy your stay.");
   loop {
     match rl.readline("> ") {
       Ok(input) => {

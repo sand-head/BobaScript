@@ -465,6 +465,7 @@ impl<'a> Compiler<'a> {
             self.locals[i].name.lexeme.clone(),
           ));
         }
+        println!("yeah we got a {} at index {}", name, i);
         return Some(i);
       }
     }

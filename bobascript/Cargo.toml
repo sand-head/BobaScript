@@ -1,5 +1,5 @@
 [package]
-name = "abscript"
+name = "bobascript"
 version = "0.1.0"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
