@@ -98,15 +98,6 @@ impl<'a> Compiler<'a> {
 
   fn statement(&mut self) {
     match self.parser.current_type() {
-      Some(TokenType::Log) => {
-        self.parser.advance();
-        self.expression();
-        self.parser.consume(
-          TokenType::Semicolon,
-          CompileError::Expected("';' after value"),
-        );
-        self.emit_opcode(OpCode::Log);
-      }
       Some(TokenType::Const) => {
         todo!("add const statement")
       }
@@ -173,6 +164,11 @@ impl<'a> Compiler<'a> {
     self.parse_precedence(Precedence::Assignment);
   }
 
+  fn log_expr(&mut self) {
+    self.expression();
+    self.emit_opcode(OpCode::Log);
+  }
+
   fn grouping(&mut self) {
     self.expression();
     self.parser.consume(
@@ -227,7 +223,7 @@ impl<'a> Compiler<'a> {
     self.patch_jump(end_jump);
   }
 
-  fn if_expression(&mut self) {
+  fn if_expr(&mut self) {
     self.expression();
     let then_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
     self.emit_opcode(OpCode::Pop);
@@ -255,7 +251,7 @@ impl<'a> Compiler<'a> {
     self.patch_jump(else_jump);
   }
 
-  fn while_expression(&mut self) {
+  fn while_expr(&mut self) {
     let loop_start = self.chunk.code.len();
     self.expression();
 
@@ -530,10 +526,11 @@ fn get_rule(token_type: TokenType) -> ParseRule {
 
     TokenType::And => parse_infix!(|c, _| c.and(), And),
     TokenType::False => parse_prefix!(|c, _| c.literal(), None),
-    TokenType::If => parse_prefix!(|c, _| c.if_expression(), None),
+    TokenType::If => parse_prefix!(|c, _| c.if_expr(), None),
+    TokenType::Log => parse_prefix!(|c, _| c.log_expr(), None),
     TokenType::Or => parse_infix!(|c, _| c.or(), Or),
     TokenType::True => parse_prefix!(|c, _| c.literal(), None),
-    TokenType::While => parse_prefix!(|c, _| c.while_expression(), None),
+    TokenType::While => parse_prefix!(|c, _| c.while_expr(), None),
 
     _ => parse_none!(),
   }

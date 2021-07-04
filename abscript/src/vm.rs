@@ -261,7 +261,7 @@ impl<'a> VM<'a> {
           self.push(Value::Number(-value));
         }
         OpCode::Log => {
-          let value = self.pop().unwrap();
+          let value = self.peek(0).unwrap().clone();
           if let Some(handler) = self.log_handler {
             handler(value);
           } else {
