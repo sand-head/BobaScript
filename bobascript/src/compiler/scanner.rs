@@ -53,6 +53,7 @@ pub enum TokenType {
   Else,
   Enum,
   False,
+  Fn,
   For,
   If,
   Let,
@@ -278,6 +279,7 @@ impl Scanner {
       },
       'f' if self.current - self.start > 1 => match self.source[self.start + 1] {
         'a' => self.check_keyword(2, 3, "lse", TokenType::False),
+        'n' => self.check_keyword(2, 0, "", TokenType::Fn),
         'o' => self.check_keyword(2, 1, "r", TokenType::For),
         _ => TokenType::Identifier,
       },

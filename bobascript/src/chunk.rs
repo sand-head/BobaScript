@@ -1,6 +1,6 @@
 use crate::value::Value;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpCode {
   Unit,
   Constant(usize),
@@ -26,6 +26,7 @@ pub enum OpCode {
   Log,
   Jump(JumpDirection, usize),
   JumpIfFalse(usize),
+  Call(u8),
   Return,
 }
 
@@ -35,6 +36,7 @@ pub enum JumpDirection {
   Backwards,
 }
 
+#[derive(Debug)]
 pub struct Chunk {
   pub code: Vec<(OpCode, usize)>,
   pub constants: Vec<Value>,

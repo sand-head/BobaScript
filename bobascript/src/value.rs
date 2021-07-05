@@ -1,13 +1,40 @@
-use std::{convert::TryInto, fmt};
+use std::{cell::RefCell, convert::TryInto, fmt, rc::Rc};
 
-use crate::vm::RuntimeError;
+use crate::{chunk::Chunk, vm::RuntimeError};
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug)]
+pub struct Function {
+  pub arity: u8,
+  pub chunk: Chunk,
+  pub name: String,
+}
+impl Default for Function {
+  fn default() -> Self {
+    Self {
+      arity: 0,
+      chunk: Chunk::default(),
+      name: String::new(),
+    }
+  }
+}
+
+pub struct NativeFunction {
+  pub function: fn(&[Value]) -> Result<Value, RuntimeError>,
+}
+impl fmt::Debug for NativeFunction {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "<native fn>")
+  }
+}
+
+#[derive(Debug, Clone)]
 pub enum Value {
   Unit,
   Number(f64),
   Boolean(bool),
   String(String),
+  Function(Rc<Function>),
+  NativeFunction(Rc<RefCell<NativeFunction>>),
 }
 
 impl TryInto<f64> for Value {
@@ -43,13 +70,41 @@ impl TryInto<String> for Value {
 
   fn try_into(self) -> Result<String, Self::Error> {
     match self {
+      Self::Unit => Ok("()".to_string()),
       Self::Number(num) => Ok(format!("{}", num)),
       Self::Boolean(bool) => Ok(format!("{}", bool)),
       Self::String(str) => Ok(str),
-      _ => Err(RuntimeError::TypeError {
-        expected: "string",
+      Self::Function(function) if function.name.len() > 0 => Ok(format!("<fn {}>", function.name)),
+      Self::Function(_) => Ok("<script>".to_string()),
+      Self::NativeFunction(native_fn) => Ok(format!("{:?}", native_fn)),
+    }
+  }
+}
+impl TryInto<Rc<Function>> for Value {
+  type Error = RuntimeError;
+
+  fn try_into(self) -> Result<Rc<Function>, Self::Error> {
+    if let Value::Function(function) = self {
+      Ok(function)
+    } else {
+      Err(RuntimeError::TypeError {
+        expected: "function",
         found: self,
-      }),
+      })
+    }
+  }
+}
+impl TryInto<Rc<RefCell<NativeFunction>>> for Value {
+  type Error = RuntimeError;
+
+  fn try_into(self) -> Result<Rc<RefCell<NativeFunction>>, Self::Error> {
+    if let Value::NativeFunction(native_fn) = self {
+      Ok(native_fn)
+    } else {
+      Err(RuntimeError::TypeError {
+        expected: "function",
+        found: self,
+      })
     }
   }
 }

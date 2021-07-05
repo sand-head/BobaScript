@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use thiserror::Error;
 
 use self::{
@@ -9,7 +11,7 @@ use crate::{
   chunk::{Chunk, JumpDirection, OpCode},
   debug::disassemble_chunk,
   parse_both, parse_infix, parse_none, parse_prefix,
-  value::Value,
+  value::{Function, Value},
 };
 
 mod parser;
@@ -32,6 +34,10 @@ pub enum CompileError {
   VariableAlreadyExists(String),
   #[error("A variable with the name \"{0}\" does not exist in scope.")]
   VariableDoesNotExist(String),
+  #[error("Functions and function calls can only have a maximum of 255 arguments. Why do you need that many?")]
+  TooManyArguments,
+  #[error("Cannot return from top-level code.")]
+  TopLevelReturn,
 }
 
 struct Local {
@@ -40,36 +46,112 @@ struct Local {
   depth: i32,
 }
 
-pub struct Compiler<'a> {
-  parser: Parser,
-  chunk: &'a mut Chunk,
+pub enum FunctionType {
+  /// The root (or top) level script.
+  TopLevel,
+  /// A function within the script.
+  Function,
+}
+pub struct CompileContext {
+  function: Function,
+  fn_type: FunctionType,
   locals: Vec<Local>,
   scope_depth: i32,
 }
-impl<'a> Compiler<'a> {
-  pub fn new(chunk: &'a mut Chunk) -> Self {
+impl CompileContext {
+  pub fn new(fn_type: FunctionType) -> Self {
     Self {
-      parser: Parser::new(String::from("")),
-      chunk,
-      locals: Vec::new(),
+      function: Function::default(),
+      fn_type,
+      locals: vec![Local {
+        name: Token {
+          token_type: TokenType::Identifier,
+          lexeme: "".to_string(),
+          line: 0,
+        },
+        depth: 0,
+      }],
       scope_depth: 0,
     }
   }
+}
 
-  pub fn compile(&mut self, source: String) -> CompileResult<()> {
+pub struct Compiler {
+  contexts: Vec<CompileContext>,
+  parser: Parser,
+}
+impl Compiler {
+  pub fn new() -> Self {
+    Self {
+      contexts: vec![CompileContext::new(FunctionType::TopLevel)],
+      parser: Parser::new(String::from("")),
+    }
+  }
+
+  pub fn compile(&mut self, source: String) -> CompileResult<Rc<Function>> {
     self.parser = Parser::new(source);
 
     self.parser.advance();
-    match self.parser.current_type() {
-      Some(TokenType::EOF) => self.parser.advance(),
-      _ => self.statement(),
+    loop {
+      match self.parser.current_type() {
+        Some(TokenType::EOF) => break self.parser.advance(),
+        _ => self.statement(),
+      }
     }
-    self.end_compiler();
+    let function = self.end_compiler();
 
     match &self.parser.error {
-      None => Ok(()),
+      None => Ok(function),
       Some(err) => Err(err.clone()),
     }
+  }
+
+  fn push_context(&mut self, fn_type: FunctionType) {
+    self.contexts.push(CompileContext {
+      function: Function::default(),
+      fn_type,
+      locals: vec![Local {
+        name: Token {
+          token_type: TokenType::Identifier,
+          lexeme: "".to_string(),
+          line: 0,
+        },
+        depth: 0,
+      }],
+      scope_depth: 0,
+    });
+  }
+
+  fn pop_context(&mut self) -> Option<CompileContext> {
+    self.contexts.pop()
+  }
+
+  fn current_context(&self) -> &CompileContext {
+    &self.contexts.last().unwrap()
+  }
+
+  fn current_context_mut(&mut self) -> &mut CompileContext {
+    self.contexts.last_mut().unwrap()
+  }
+
+  fn current_chunk(&mut self) -> &mut Chunk {
+    &mut self.contexts.last_mut().unwrap().function.chunk
+  }
+
+  fn scope_depth(&self) -> i32 {
+    self.contexts.last().unwrap().scope_depth
+  }
+
+  fn scope_depth_mut(&mut self) -> &mut i32 {
+    &mut self.contexts.last_mut().unwrap().scope_depth
+  }
+
+  fn locals(&self) -> &Vec<Local> {
+    &self.contexts.last().unwrap().locals
+  }
+
+  fn locals_mut(&mut self) -> &mut Vec<Local> {
+    &mut self.contexts.last_mut().unwrap().locals
   }
 
   fn parse_precedence(&mut self, precedence: Precedence) {
@@ -106,13 +188,17 @@ impl<'a> Compiler<'a> {
         self.parser.advance();
         self.declaration();
       }
+      Some(TokenType::Return) => {
+        self.parser.advance();
+        self.return_stmt();
+      }
       Some(_) => {
         self.expression();
         let previous_type = self.parser.previous_type();
         let current_type = self.parser.current_type();
 
         match (previous_type, current_type) {
-          (_, Some(TokenType::RightBrace)) if self.scope_depth > 0 => {
+          (_, Some(TokenType::RightBrace)) if self.scope_depth() > 0 => {
             // do nothing
             // this allows us to use the last expression in a block in assigning new variables
             // ex: let test = { let test2 = 15; test2 / 3 };
@@ -160,6 +246,24 @@ impl<'a> Compiler<'a> {
     self.define_variable(global);
   }
 
+  fn return_stmt(&mut self) {
+    if let FunctionType::TopLevel = self.current_context().fn_type {
+      self.parser.set_error(CompileError::TopLevelReturn);
+    }
+
+    if let Some(TokenType::Semicolon) = self.parser.current_type() {
+      self.parser.advance();
+      self.emit_opcode(OpCode::Return);
+    } else {
+      self.expression();
+      self.parser.consume(
+        TokenType::Semicolon,
+        CompileError::Expected("';' after return value"),
+      );
+      self.emit_opcode(OpCode::Return);
+    }
+  }
+
   fn expression(&mut self) {
     self.parse_precedence(Precedence::Assignment);
   }
@@ -167,6 +271,26 @@ impl<'a> Compiler<'a> {
   fn log_expr(&mut self) {
     self.expression();
     self.emit_opcode(OpCode::Log);
+  }
+
+  fn and(&mut self) {
+    let end_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+
+    self.emit_opcode(OpCode::Pop);
+    self.parse_precedence(Precedence::And);
+
+    self.patch_jump(end_jump);
+  }
+
+  fn or(&mut self) {
+    let else_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+    let end_jump = self.emit_opcode_idx(OpCode::Jump(JumpDirection::Forwards, 0));
+
+    self.patch_jump(else_jump);
+    self.emit_opcode(OpCode::Pop);
+
+    self.parse_precedence(Precedence::Or);
+    self.patch_jump(end_jump);
   }
 
   fn grouping(&mut self) {
@@ -191,8 +315,7 @@ impl<'a> Compiler<'a> {
     // OR if there weren't any statements and it was an empty block,
     // emit a unit so that the expression always has a value
     if let Some(TokenType::Semicolon | TokenType::LeftBrace) = self.parser.previous_type() {
-      let idx = self.make_constant(Value::Unit);
-      self.emit_opcode(OpCode::Constant(idx));
+      self.emit_opcode(OpCode::Unit);
     }
 
     self.parser.consume(
@@ -203,24 +326,51 @@ impl<'a> Compiler<'a> {
     self.end_scope();
   }
 
-  fn and(&mut self) {
-    let end_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+  fn fn_expr(&mut self) {
+    // let compiler = Compiler::child(Rc::new(RefCell::new(self)), FunctionType::Function);
+    // this *might* work without having to bring unsafe rust into it... fingers crossed!
+    self.push_context(FunctionType::Function);
+    self.begin_scope();
 
-    self.emit_opcode(OpCode::Pop);
-    self.parse_precedence(Precedence::And);
+    self.parser.consume(
+      TokenType::LeftParen,
+      CompileError::Expected("'(' after \"fn\" keyword"),
+    );
+    if self.parser.current_type() != Some(TokenType::RightParen) {
+      // there's something in these dang parentheses
+      loop {
+        if self.current_context().function.arity == u8::MAX {
+          // todo: throw too many parameters error
+        } else {
+          self.current_context_mut().function.arity += 1;
+        }
 
-    self.patch_jump(end_jump);
-  }
+        // parse the parameter
+        let idx = self.parse_variable(CompileError::Expected("parameter name"));
+        self.define_variable(idx);
 
-  fn or(&mut self) {
-    let else_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
-    let end_jump = self.emit_opcode_idx(OpCode::Jump(JumpDirection::Forwards, 0));
+        if self.parser.current_type() != Some(TokenType::Comma) {
+          // break if no more parameters
+          break;
+        } else {
+          self.parser.advance();
+        }
+      }
+    }
+    self.parser.consume(
+      TokenType::RightParen,
+      CompileError::Expected("')' after parameters"),
+    );
+    self.parser.consume(
+      TokenType::LeftBrace,
+      CompileError::Expected("block after parameters"),
+    );
+    self.block();
+    self.emit_opcode(OpCode::Return);
 
-    self.patch_jump(else_jump);
-    self.emit_opcode(OpCode::Pop);
-
-    self.parse_precedence(Precedence::Or);
-    self.patch_jump(end_jump);
+    let context = self.pop_context().unwrap();
+    let idx = self.make_constant(Value::Function(Rc::new(context.function)));
+    self.emit_opcode(OpCode::Constant(idx));
   }
 
   fn if_expr(&mut self) {
@@ -252,7 +402,7 @@ impl<'a> Compiler<'a> {
   }
 
   fn while_expr(&mut self) {
-    let loop_start = self.chunk.code.len();
+    let loop_start = self.current_chunk().code.len();
     self.expression();
 
     let exit_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
@@ -274,8 +424,7 @@ impl<'a> Compiler<'a> {
     self.emit_opcode(OpCode::Pop);
 
     // ...however, since this *is* still an expression, it must return *something*
-    let idx = self.make_constant(Value::Unit);
-    self.emit_opcode(OpCode::Constant(idx));
+    self.emit_opcode(OpCode::Unit);
   }
 
   fn unary(&mut self) {
@@ -322,6 +471,36 @@ impl<'a> Compiler<'a> {
     }
   }
 
+  fn call(&mut self) {
+    let arg_count = self.argument_list();
+    self.emit_opcode(OpCode::Call(arg_count));
+  }
+
+  fn argument_list(&mut self) -> u8 {
+    let mut arg_count = 0;
+    if self.parser.current_type() != Some(TokenType::RightParen) {
+      loop {
+        self.expression();
+        if arg_count == u8::MAX {
+          self.parser.set_error(CompileError::TooManyArguments);
+        } else {
+          arg_count += 1;
+        }
+
+        if self.parser.current_type() == Some(TokenType::Comma) {
+          self.parser.advance();
+        } else {
+          break;
+        }
+      }
+    }
+    self.parser.consume(
+      TokenType::RightParen,
+      CompileError::Expected("')' after arguments"),
+    );
+    arg_count
+  }
+
   fn literal(&mut self) {
     match self.parser.previous_type() {
       Some(TokenType::Unit) => self.emit_opcode(OpCode::Unit),
@@ -351,32 +530,30 @@ impl<'a> Compiler<'a> {
   }
 
   fn make_constant(&mut self, value: Value) -> usize {
-    self.chunk.add_constant(value)
+    self.current_chunk().add_constant(value)
   }
 
   fn emit_opcode(&mut self, opcode: OpCode) {
-    self
-      .chunk
-      .write(opcode, self.parser.previous().unwrap().line);
+    let line_no = self.parser.previous().unwrap().line;
+    self.current_chunk().write(opcode, line_no);
   }
 
   /// Emits the given `OpCode` and returns its index in the chunk.
   fn emit_opcode_idx(&mut self, opcode: OpCode) -> usize {
-    self
-      .chunk
-      .write(opcode, self.parser.previous().unwrap().line)
+    let line_no = self.parser.previous().unwrap().line;
+    self.current_chunk().write(opcode, line_no)
   }
 
   /// This just emits a `Jump` instruction, but backwards
   fn emit_loop(&mut self, start: usize) {
-    let offset = self.chunk.code.len() - start + 1;
+    let offset = self.current_chunk().code.len() - start + 1;
     self.emit_opcode(OpCode::Jump(JumpDirection::Backwards, offset));
   }
 
   fn patch_jump(&mut self, offset: usize) {
-    let new_jump = self.chunk.code.len() - 1 - offset;
-    let (opcode, line) = &self.chunk.code[offset];
-    self.chunk.code[offset] = (
+    let new_jump = self.current_chunk().code.len() - 1 - offset;
+    let (opcode, line) = &self.current_chunk().code[offset];
+    self.current_chunk().code[offset] = (
       match opcode {
         OpCode::Jump(direction, _) => OpCode::Jump(*direction, new_jump),
         OpCode::JumpIfFalse(_) => OpCode::JumpIfFalse(new_jump),
@@ -387,16 +564,16 @@ impl<'a> Compiler<'a> {
   }
 
   fn begin_scope(&mut self) {
-    self.scope_depth += 1;
+    *self.scope_depth_mut() += 1;
   }
 
   fn end_scope(&mut self) {
-    self.scope_depth -= 1;
+    *self.scope_depth_mut() -= 1;
 
     let mut count: usize = 0;
-    for i in (0..self.locals.len()).rev() {
-      if self.locals[i].depth > self.scope_depth {
-        self.locals.remove(i);
+    for i in (0..self.locals().len()).rev() {
+      if self.locals()[i].depth > self.scope_depth() {
+        self.locals_mut().remove(i);
         count += 1;
       } else {
         break;
@@ -413,7 +590,7 @@ impl<'a> Compiler<'a> {
     self.parser.consume(TokenType::Identifier, err);
     self.declare_variable();
 
-    if self.scope_depth > 0 {
+    if self.scope_depth() > 0 {
       0
     } else {
       self.identifier_constant(self.parser.previous().unwrap().lexeme.clone())
@@ -421,13 +598,13 @@ impl<'a> Compiler<'a> {
   }
 
   fn mark_initialized(&mut self) {
-    let idx = self.locals.len() - 1;
-    self.locals[idx].depth = self.scope_depth;
+    let idx = self.locals().len() - 1;
+    self.locals_mut()[idx].depth = self.scope_depth();
   }
 
   /// Initializes a variable in the scope for use
   fn define_variable(&mut self, global: usize) {
-    if self.scope_depth > 0 {
+    if self.scope_depth() > 0 {
       self.mark_initialized();
     } else {
       self.emit_opcode(OpCode::DefineGlobal(global));
@@ -436,20 +613,27 @@ impl<'a> Compiler<'a> {
 
   /// Adds a variable to the scope
   fn declare_variable(&mut self) {
-    if self.scope_depth > 0 {
+    if self.scope_depth() > 0 {
       let name = self.parser.previous().unwrap().clone();
-      for local in self.locals.iter().rev() {
-        if local.depth != -1 && local.depth < self.scope_depth {
+      // todo: this sucks
+      let mut name_exists = false;
+      for local in self.locals().iter().rev() {
+        if local.depth != -1 && local.depth < self.scope_depth() {
           break;
         }
         if &name.lexeme == &local.name.lexeme {
-          self
-            .parser
-            .set_error(CompileError::VariableAlreadyExists(name.lexeme.clone()));
+          name_exists = true;
+          break;
         }
       }
 
-      self.locals.push(Local { name, depth: -1 });
+      if name_exists {
+        self
+          .parser
+          .set_error(CompileError::VariableAlreadyExists(name.lexeme.clone()));
+      } else {
+        self.locals_mut().push(Local { name, depth: -1 });
+      }
     }
   }
 
@@ -458,11 +642,11 @@ impl<'a> Compiler<'a> {
   }
 
   fn resolve_local(&mut self, name: &String) -> Option<usize> {
-    for i in (0..self.locals.len()).rev() {
-      if name == &self.locals[i].name.lexeme {
-        if self.locals[i].depth == -1 {
+    for i in (0..self.locals().len()).rev() {
+      if name == &self.locals()[i].name.lexeme {
+        if self.locals()[i].depth == -1 {
           self.parser.set_error(CompileError::VariableDoesNotExist(
-            self.locals[i].name.lexeme.clone(),
+            self.locals()[i].name.lexeme.clone(),
           ));
         }
         // println!("yeah we got a {} at index {}", name, i);
@@ -523,20 +707,30 @@ impl<'a> Compiler<'a> {
     }
   }
 
-  fn end_compiler(&mut self) {
+  fn end_compiler(&mut self) -> Rc<Function> {
+    self.emit_opcode(OpCode::Unit);
     self.emit_opcode(OpCode::Return);
-    if crate::DEBUG
-    /* && self.parser.error.is_none() */
-    {
-      disassemble_chunk(self.chunk, "code");
+    let context = self.contexts.pop().unwrap();
+
+    if crate::DEBUG && self.parser.error.is_none() {
+      disassemble_chunk(
+        &context.function.chunk,
+        if context.function.name.len() > 0 {
+          &context.function.name
+        } else {
+          "[script]"
+        },
+      );
     }
+
+    Rc::new(context.function)
   }
 }
 
 /// Gets the appropriate `ParseRule` for the given `TokenType`.
 fn get_rule(token_type: TokenType) -> ParseRule {
   match token_type {
-    TokenType::LeftParen => parse_prefix!(|c, _| c.grouping(), None),
+    TokenType::LeftParen => parse_both!(|c, _| c.grouping(), |c, _| c.call(), Call),
     TokenType::LeftBrace => parse_prefix!(|c, _| c.block(), None),
 
     TokenType::Asterisk => parse_infix!(|c, _| c.binary(), Factor),
@@ -560,6 +754,7 @@ fn get_rule(token_type: TokenType) -> ParseRule {
 
     TokenType::And => parse_infix!(|c, _| c.and(), And),
     TokenType::False => parse_prefix!(|c, _| c.literal(), None),
+    TokenType::Fn => parse_prefix!(|c, _| c.fn_expr(), None),
     TokenType::If => parse_prefix!(|c, _| c.if_expr(), None),
     TokenType::Log => parse_prefix!(|c, _| c.log_expr(), None),
     TokenType::Or => parse_infix!(|c, _| c.or(), Or),

@@ -27,12 +27,33 @@ pub enum InterpretError {
 
 #[cfg(test)]
 mod tests {
-  use crate::vm::VM;
+  use crate::{value::Value, vm::VM};
 
   #[test]
   fn no_type_error_when_concat_string_and_block_expr() {
     let mut vm = VM::new();
     let result = vm.interpret("let test = \"1\" + { let test2 = 15; test2 / 3 };");
     assert!(result.is_ok());
+  }
+
+  #[test]
+  fn recursion_works() {
+    let mut vm = VM::new();
+    let result = vm.interpret(
+      r#"
+      let fib = fn(n) {
+        if n < 2 {
+          n
+        } else {
+          fib(n - 2) + fib(n - 1)
+        }
+      };
+
+      log fib(10);
+      "#,
+    );
+    assert!(result.is_ok());
+    // let value = result.unwrap();
+    // assert_eq!(value, Value::Number(55));
   }
 }

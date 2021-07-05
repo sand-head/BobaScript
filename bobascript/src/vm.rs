@@ -1,12 +1,14 @@
-use std::{collections::HashMap, convert::TryInto, iter::repeat};
+use std::{
+  cell::RefCell, collections::HashMap, convert::TryInto, iter::repeat, mem::discriminant, rc::Rc,
+};
 
 use thiserror::Error;
 
 use crate::{
-  chunk::{Chunk, JumpDirection, OpCode},
+  chunk::{JumpDirection, OpCode},
   compiler::Compiler,
   debug::disassemble_instruction,
-  value::Value,
+  value::{Function, NativeFunction, Value},
   InterpretResult,
 };
 
@@ -32,12 +34,23 @@ pub enum RuntimeError {
   OperationNotSupported,
   #[error("Undefined variable \"{0}\".")]
   UndefinedVariable(String),
+  #[error("Only functions and classes may be called.")]
+  InvalidCallSignature,
+  #[error("Expected {0} arguments, but got {1}.")]
+  IncorrectParameterCount(u8, u8),
+  #[error("Stack overflow.")]
+  StackOverflow,
+}
+
+struct CallFrame {
+  function: Rc<Function>,
+  ip: usize,
+  slots_start: usize,
 }
 
 pub struct VM<'a> {
   log_handler: Option<&'a dyn Fn(Value) -> ()>,
-  chunk: Chunk,
-  ip: usize,
+  frames: Vec<CallFrame>,
   stack: Vec<Value>,
   globals: HashMap<String, Value>,
 }
@@ -45,8 +58,7 @@ impl<'a> VM<'a> {
   pub fn new() -> Self {
     Self {
       log_handler: None,
-      chunk: Chunk::default(),
-      ip: 0,
+      frames: Vec::with_capacity(64),
       stack: Vec::with_capacity(256),
       globals: HashMap::new(),
     }
@@ -56,23 +68,39 @@ impl<'a> VM<'a> {
     self.log_handler = Some(handler);
   }
 
+  pub fn define_native(&mut self, name: String, function: Rc<RefCell<NativeFunction>>) {
+    self.push(Value::String(name));
+    self.push(Value::NativeFunction(function));
+    self.globals.insert(
+      self.stack[0].clone().try_into().unwrap(),
+      self.stack[1].clone().try_into().unwrap(),
+    );
+    self.pop_n(2);
+  }
+
   pub fn interpret<S>(&mut self, source: S) -> InterpretResult<Value>
   where
     S: Into<String>,
   {
-    let mut chunk = Chunk::default();
-    let mut compiler = Compiler::new(&mut chunk);
-    match compiler.compile(source.into()) {
-      Ok(_) => {
-        self.chunk = chunk;
-        self.ip = 0;
-        self.run()
-      }
-      Err(err) => {
-        self.stack.clear();
-        Err(err.into())
-      }
-    }
+    let mut compiler = Compiler::new();
+    let function = compiler.compile(source.into())?;
+
+    self.push(Value::Function(function.clone()));
+    self.call(function, 0)?;
+
+    let result = self.run();
+    self.stack.clear();
+    self.frames.clear();
+    result
+  }
+
+  fn frame(&self) -> &CallFrame {
+    &self.frames[self.frames.len() - 1]
+  }
+
+  fn frame_mut(&mut self) -> &mut CallFrame {
+    let current_frame = self.frames.len() - 1;
+    &mut self.frames[current_frame]
   }
 
   fn push(&mut self, value: Value) {
@@ -85,6 +113,12 @@ impl<'a> VM<'a> {
 
   fn pop(&mut self) -> Option<Value> {
     self.stack.pop()
+  }
+
+  fn pop_n(&mut self, count: usize) {
+    for _ in 0..count {
+      self.pop();
+    }
   }
 
   fn pop_as<T>(&mut self) -> InterpretResult<T>
@@ -121,11 +155,45 @@ impl<'a> VM<'a> {
     }
   }
 
+  fn call_value(&mut self, callee: Value, arg_count: u8) -> InterpretResult<()> {
+    match callee {
+      Value::Function(function) => {
+        self.call(function, arg_count)?;
+        Ok(())
+      }
+      Value::NativeFunction(native_fn) => {
+        let arg_start = self.stack.len() - 1 - (arg_count as usize);
+        let args = &self.stack[arg_start..];
+        (native_fn.borrow().function)(args)?;
+        self.pop_n(arg_count as usize);
+        Ok(())
+      }
+      _ => Err(RuntimeError::InvalidCallSignature.into()),
+    }
+  }
+
+  fn call(&mut self, function: Rc<Function>, arg_count: u8) -> InterpretResult<()> {
+    if arg_count != function.arity {
+      return Err(RuntimeError::IncorrectParameterCount(function.arity, arg_count).into());
+    }
+    if self.frames.len() == 64 {
+      return Err(RuntimeError::StackOverflow.into());
+    }
+
+    self.frames.push(CallFrame {
+      function,
+      ip: 0,
+      slots_start: self.stack.len() - 1 - (arg_count as usize),
+    });
+    Ok(())
+  }
+
   fn run(&mut self) -> InterpretResult<Value> {
     loop {
       let (instruction, line) = {
-        let instruction = &self.chunk.code[self.ip];
-        self.ip += 1;
+        let frame = self.frame();
+        let instruction = frame.function.chunk.code[frame.ip].clone();
+        self.frame_mut().ip += 1;
         instruction
       };
 
@@ -135,13 +203,18 @@ impl<'a> VM<'a> {
           print!("[{}]", value);
         }
         println!();
-        disassemble_instruction(&self.chunk, instruction, line, self.ip);
+        disassemble_instruction(
+          &self.frame().function.chunk,
+          &instruction,
+          &line,
+          self.frame().ip,
+        );
       }
 
       match instruction {
         OpCode::Unit => self.push(Value::Unit),
         OpCode::Constant(idx) => {
-          let constant = self.chunk.constants[*idx].clone();
+          let constant = self.frame().function.chunk.constants[idx].clone();
           self.push(constant);
         }
         OpCode::True => self.push(Value::Boolean(true)),
@@ -150,25 +223,24 @@ impl<'a> VM<'a> {
           self.pop();
         }
         OpCode::PopN(count) => {
-          for _ in 0..*count {
-            self.pop();
-          }
+          self.pop_n(count);
         }
         OpCode::DefineGlobal(global) => {
-          let global = self.chunk.constants[*global].clone();
+          let global = self.frame().function.chunk.constants[global].clone();
           let name: String = global.try_into()?;
           self.globals.insert(name, self.peek(0).unwrap().clone());
           self.pop();
         }
         OpCode::GetLocal(local) => {
-          let local = self.stack[*local].clone();
+          let local = self.stack[self.frame().slots_start + local].clone();
           self.push(local);
         }
         OpCode::SetLocal(local) => {
-          self.stack[*local] = self.peek(0).unwrap().clone();
+          let slot_offset = self.frame().slots_start;
+          self.stack[slot_offset + local] = self.peek(0).unwrap().clone();
         }
         OpCode::GetGlobal(global) => {
-          let global = self.chunk.constants[*global].clone();
+          let global = self.frame().function.chunk.constants[global].clone();
           let name: String = global.try_into()?;
 
           let value = self
@@ -180,7 +252,7 @@ impl<'a> VM<'a> {
           self.push(value);
         }
         OpCode::SetGlobal(global) => {
-          let global = self.chunk.constants[*global].clone();
+          let global = self.frame().function.chunk.constants[global].clone();
           let name: String = global.try_into()?;
           let new_value = self.peek(0).unwrap().clone();
 
@@ -219,7 +291,7 @@ impl<'a> VM<'a> {
               let a = self.pop_as::<String>()?;
               self.push(Value::String(format!("{}{}", a, b)));
             }
-            _ => return Err(RuntimeError::OperationNotSupported.into()),
+            _ => break Err(RuntimeError::OperationNotSupported.into()),
           }
         }
         OpCode::Subtract => {
@@ -241,7 +313,7 @@ impl<'a> VM<'a> {
               let value: String = repeat(a).take(b.round() as usize).collect();
               self.push(Value::String(value));
             }
-            _ => return Err(RuntimeError::OperationNotSupported.into()),
+            _ => break Err(RuntimeError::OperationNotSupported.into()),
           }
         }
         OpCode::Divide => {
@@ -269,17 +341,32 @@ impl<'a> VM<'a> {
           }
         }
         OpCode::Jump(direction, offset) => match direction {
-          JumpDirection::Forwards => self.ip += offset,
-          JumpDirection::Backwards => self.ip -= offset,
+          JumpDirection::Forwards => self.frame_mut().ip += offset,
+          JumpDirection::Backwards => self.frame_mut().ip -= offset,
         },
         OpCode::JumpIfFalse(offset) => {
           let condition: bool = self.peek(0).unwrap().clone().try_into().unwrap();
           if !condition {
-            self.ip += offset;
+            self.frame_mut().ip += offset;
           }
         }
+        OpCode::Call(args) => {
+          self.call_value(self.peek(args as usize).unwrap().clone(), args)?;
+        }
         OpCode::Return => {
-          return Ok(Value::Unit);
+          let result = self.pop().unwrap_or_else(|| Value::Unit);
+          if self.frames.len() == 1 {
+            // if this is the last frame, pop it and break the loop
+            self.frames.pop();
+            self.pop();
+            break Ok(result);
+          }
+
+          // otherwise, pop everything in that frame's stack window and push the result back
+          let pop_count = self.stack.len() - self.frame().slots_start;
+          self.pop_n(pop_count);
+          self.push(result);
+          self.frames.pop();
         }
       }
     }
