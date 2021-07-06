@@ -2,7 +2,7 @@ use crate::value::Value;
 
 #[derive(Debug, Clone)]
 pub enum OpCode {
-  Unit,
+  Tuple(u8),
   Constant(usize),
   True,
   False,

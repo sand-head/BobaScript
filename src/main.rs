@@ -46,7 +46,7 @@ fn main() -> InterpretResult<()> {
       Ok(input) => {
         rl.add_history_entry(&input);
         match vm.interpret(input) {
-          Ok(Value::Unit) => {}
+          // Ok(Value::Tuple(tuple)) if tuple.len() == 0 => {}
           Ok(value) => println!("< {}", value),
           Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
         }

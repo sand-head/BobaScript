@@ -29,12 +29,17 @@ impl fmt::Debug for NativeFunction {
 
 #[derive(Debug, Clone)]
 pub enum Value {
-  Unit,
+  Tuple(Box<[Value]>),
   Number(f64),
   Boolean(bool),
   String(String),
   Function(Rc<Function>),
   NativeFunction(Rc<RefCell<NativeFunction>>),
+}
+impl Value {
+  pub fn get_unit() -> Value {
+    Value::Tuple(vec![].into_boxed_slice())
+  }
 }
 
 impl TryInto<f64> for Value {
@@ -70,7 +75,14 @@ impl TryInto<String> for Value {
 
   fn try_into(self) -> Result<String, Self::Error> {
     match self {
-      Self::Unit => Ok("()".to_string()),
+      Self::Tuple(tuple) => Ok(format!(
+        "({})",
+        tuple
+          .iter()
+          .map(|v| v.clone().try_into().unwrap())
+          .collect::<Vec<String>>()
+          .join(", ")
+      )),
       Self::Number(num) => Ok(format!("{}", num)),
       Self::Boolean(bool) => Ok(format!("{}", bool)),
       Self::String(str) => Ok(str),
@@ -112,7 +124,6 @@ impl TryInto<Rc<RefCell<NativeFunction>>> for Value {
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Unit => write!(f, "()"),
       _ => {
         let value: String = Value::try_into(self.clone()).unwrap();
         if let Self::String(_) = self {

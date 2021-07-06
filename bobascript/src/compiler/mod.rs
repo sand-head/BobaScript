@@ -46,6 +46,7 @@ struct Local {
   depth: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FunctionType {
   /// The root (or top) level script.
   TopLevel,
@@ -180,6 +181,10 @@ impl Compiler {
 
   fn statement(&mut self) {
     match self.parser.current_type() {
+      Some(TokenType::Fn) => {
+        self.parser.advance();
+        self.fn_declaration();
+      }
       Some(TokenType::Const) => {
         todo!("add const statement")
       }
@@ -229,6 +234,14 @@ impl Compiler {
     }
   }
 
+  fn fn_declaration(&mut self) {
+    // this *might* work without having to bring unsafe rust into it... fingers crossed!
+    let global_idx = self.parse_variable(CompileError::Expected("function name"));
+    self.mark_initialized();
+    self.function(FunctionType::Function);
+    self.define_variable(global_idx);
+  }
+
   fn declaration(&mut self) {
     let global = self.parse_variable(CompileError::Expected("variable name"));
 
@@ -236,7 +249,7 @@ impl Compiler {
       self.parser.advance();
       self.expression();
     } else {
-      self.emit_opcode(OpCode::Unit);
+      self.emit_opcode(OpCode::Tuple(0));
     }
     self.parser.consume(
       TokenType::Semicolon,
@@ -294,16 +307,34 @@ impl Compiler {
   }
 
   fn grouping(&mut self) {
+    // check if this is actually a unit
+    if let Some(TokenType::RightParen) = self.parser.current_type() {
+      self.emit_opcode(OpCode::Tuple(0));
+      return;
+    }
+
     self.expression();
-    self.parser.consume(
-      TokenType::RightParen,
-      CompileError::Expected("')' after expression"),
-    );
+    match self.parser.current_type() {
+      Some(TokenType::Comma) => {
+        self.parser.advance();
+        self.tuple();
+      }
+      _ => {
+        self.parser.consume(
+          TokenType::RightParen,
+          CompileError::Expected("')' after expression"),
+        );
+      }
+    }
   }
 
   fn block(&mut self) {
     self.begin_scope();
+    self.raw_block();
+    self.end_scope();
+  }
 
+  fn raw_block(&mut self) {
     loop {
       match self.parser.current_type().unwrap() {
         TokenType::RightBrace | TokenType::EOF => break,
@@ -315,26 +346,25 @@ impl Compiler {
     // OR if there weren't any statements and it was an empty block,
     // emit a unit so that the expression always has a value
     if let Some(TokenType::Semicolon | TokenType::LeftBrace) = self.parser.previous_type() {
-      self.emit_opcode(OpCode::Unit);
+      self.emit_opcode(OpCode::Tuple(0));
     }
 
     self.parser.consume(
       TokenType::RightBrace,
       CompileError::Expected("'}' after block"),
     );
-
-    self.end_scope();
   }
 
-  fn fn_expr(&mut self) {
-    // let compiler = Compiler::child(Rc::new(RefCell::new(self)), FunctionType::Function);
-    // this *might* work without having to bring unsafe rust into it... fingers crossed!
-    self.push_context(FunctionType::Function);
+  fn function(&mut self, fn_type: FunctionType) {
+    self.push_context(fn_type);
+    if fn_type != FunctionType::TopLevel {
+      self.current_context_mut().function.name = self.parser.previous().unwrap().lexeme.clone();
+    }
     self.begin_scope();
 
     self.parser.consume(
       TokenType::LeftParen,
-      CompileError::Expected("'(' after \"fn\" keyword"),
+      CompileError::Expected("'(' after function name"),
     );
     if self.parser.current_type() != Some(TokenType::RightParen) {
       // there's something in these dang parentheses
@@ -365,10 +395,21 @@ impl Compiler {
       TokenType::LeftBrace,
       CompileError::Expected("block after parameters"),
     );
-    self.block();
+    self.raw_block();
     self.emit_opcode(OpCode::Return);
 
     let context = self.pop_context().unwrap();
+    if crate::DEBUG && (self.parser.error.is_none() || crate::SUPER_DEBUG) {
+      disassemble_chunk(
+        &context.function.chunk,
+        if context.function.name.len() > 0 {
+          &context.function.name
+        } else {
+          "[script]"
+        },
+      );
+    }
+
     let idx = self.make_constant(Value::Function(Rc::new(context.function)));
     self.emit_opcode(OpCode::Constant(idx));
   }
@@ -424,7 +465,7 @@ impl Compiler {
     self.emit_opcode(OpCode::Pop);
 
     // ...however, since this *is* still an expression, it must return *something*
-    self.emit_opcode(OpCode::Unit);
+    self.emit_opcode(OpCode::Tuple(0));
   }
 
   fn unary(&mut self) {
@@ -503,7 +544,6 @@ impl Compiler {
 
   fn literal(&mut self) {
     match self.parser.previous_type() {
-      Some(TokenType::Unit) => self.emit_opcode(OpCode::Unit),
       Some(TokenType::False) => self.emit_opcode(OpCode::False),
       Some(TokenType::True) => self.emit_opcode(OpCode::True),
       _ => unreachable!(),
@@ -512,6 +552,34 @@ impl Compiler {
 
   fn variable(&mut self, can_assign: bool) {
     self.named_variable(self.parser.previous().unwrap().lexeme.clone(), can_assign)
+  }
+
+  fn tuple(&mut self) {
+    // if we get here, we've already parsed one expression
+    let mut count: u8 = 1;
+
+    loop {
+      if let Some(TokenType::RightParen) = self.parser.current_type() {
+        // tuples can end in a comma-right parenthesis combo
+        // this allows single-item tuples to exist
+        self.parser.advance();
+        break;
+      }
+
+      self.expression();
+      count += 1;
+
+      match self.parser.current_type() {
+        Some(TokenType::Comma) => self.parser.advance(),
+        Some(TokenType::RightParen) => {
+          self.parser.advance();
+          break;
+        }
+        _ => (),
+      }
+    }
+
+    self.emit_opcode(OpCode::Tuple(count));
   }
 
   fn string(&mut self) {
@@ -598,8 +666,10 @@ impl Compiler {
   }
 
   fn mark_initialized(&mut self) {
-    let idx = self.locals().len() - 1;
-    self.locals_mut()[idx].depth = self.scope_depth();
+    if self.scope_depth() != 0 {
+      let idx = self.locals().len() - 1;
+      self.locals_mut()[idx].depth = self.scope_depth();
+    }
   }
 
   /// Initializes a variable in the scope for use
@@ -708,11 +778,11 @@ impl Compiler {
   }
 
   fn end_compiler(&mut self) -> Rc<Function> {
-    self.emit_opcode(OpCode::Unit);
+    self.emit_opcode(OpCode::Tuple(0));
     self.emit_opcode(OpCode::Return);
     let context = self.contexts.pop().unwrap();
 
-    if crate::DEBUG && self.parser.error.is_none() {
+    if crate::DEBUG && (self.parser.error.is_none() || crate::SUPER_DEBUG) {
       disassemble_chunk(
         &context.function.chunk,
         if context.function.name.len() > 0 {
@@ -747,14 +817,13 @@ fn get_rule(token_type: TokenType) -> ParseRule {
     TokenType::LessThan => parse_infix!(|c, _| c.binary(), Comparison),
     TokenType::LessEqual => parse_infix!(|c, _| c.binary(), Comparison),
 
-    TokenType::Unit => parse_prefix!(|c, _| c.literal(), None),
     TokenType::Identifier => parse_prefix!(|c, can_assign| c.variable(can_assign), None),
     TokenType::String => parse_prefix!(|c, _| c.string(), None),
     TokenType::Number => parse_prefix!(|c, _| c.number(), None),
 
     TokenType::And => parse_infix!(|c, _| c.and(), And),
     TokenType::False => parse_prefix!(|c, _| c.literal(), None),
-    TokenType::Fn => parse_prefix!(|c, _| c.fn_expr(), None),
+    // TokenType::Fn => parse_prefix!(|c, _| c.fn_expr(), None),
     TokenType::If => parse_prefix!(|c, _| c.if_expr(), None),
     TokenType::Log => parse_prefix!(|c, _| c.log_expr(), None),
     TokenType::Or => parse_infix!(|c, _| c.or(), Or),

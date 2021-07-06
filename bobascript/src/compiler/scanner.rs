@@ -39,7 +39,6 @@ pub enum TokenType {
   LessThan,
   LessEqual,
   // literals:
-  Unit,
   Identifier,
   String,
   Number,
@@ -100,11 +99,7 @@ impl Scanner {
       '0'..='9' => Ok(self.make_number()),
       'a'..='z' | 'A'..='Z' | '_' => Ok(self.make_identifier()),
       '"' => Ok(self.make_string()?),
-      '(' => Ok(if self.current_matches(')') {
-        self.make_token(TokenType::Unit)
-      } else {
-        self.make_token(TokenType::LeftParen)
-      }),
+      '(' => Ok(self.make_token(TokenType::LeftParen)),
       ')' => Ok(self.make_token(TokenType::RightParen)),
       '{' => Ok(self.make_token(TokenType::LeftBrace)),
       '}' => Ok(self.make_token(TokenType::RightBrace)),

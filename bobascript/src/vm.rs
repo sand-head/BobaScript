@@ -210,7 +210,14 @@ impl<'a> VM<'a> {
       }
 
       match instruction {
-        OpCode::Unit => self.push(Value::Unit),
+        OpCode::Tuple(length) => {
+          let mut tuple = Vec::new();
+          for _ in 0..length {
+            tuple.push(self.pop().unwrap());
+          }
+          tuple.reverse();
+          self.push(Value::Tuple(tuple.into_boxed_slice()));
+        }
         OpCode::Constant(idx) => {
           let constant = self.frame().function.chunk.constants[idx].clone();
           self.push(constant);
@@ -352,7 +359,7 @@ impl<'a> VM<'a> {
           self.call_value(self.peek(args as usize).unwrap().clone(), args)?;
         }
         OpCode::Return => {
-          let result = self.pop().unwrap_or_else(|| Value::Unit);
+          let result = self.pop().unwrap_or_else(|| Value::get_unit());
           if self.frames.len() == 1 {
             // if this is the last frame, pop it and break the loop
             self.frames.pop();

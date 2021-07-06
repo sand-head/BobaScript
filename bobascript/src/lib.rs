@@ -13,6 +13,11 @@ pub const DEBUG: bool = false;
 #[cfg(feature = "debug")]
 pub const DEBUG: bool = true;
 
+#[cfg(not(feature = "super_debug"))]
+pub const SUPER_DEBUG: bool = false;
+#[cfg(feature = "super_debug")]
+pub const SUPER_DEBUG: bool = true;
+
 pub type InterpretResult<T> = Result<T, InterpretError>;
 
 #[derive(Error, Debug)]
@@ -27,7 +32,7 @@ pub enum InterpretError {
 
 #[cfg(test)]
 mod tests {
-  use crate::{value::Value, vm::VM};
+  use crate::vm::VM;
 
   #[test]
   fn no_type_error_when_concat_string_and_block_expr() {
@@ -41,17 +46,18 @@ mod tests {
     let mut vm = VM::new();
     let result = vm.interpret(
       r#"
-      let fib = fn(n) {
+      fn fib(n) {
         if n < 2 {
           n
         } else {
           fib(n - 2) + fib(n - 1)
         }
-      };
+      }
 
       log fib(10);
       "#,
     );
+    println!("{:?}", result);
     assert!(result.is_ok());
     // let value = result.unwrap();
     // assert_eq!(value, Value::Number(55));
