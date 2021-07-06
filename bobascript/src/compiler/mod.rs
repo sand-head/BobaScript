@@ -309,6 +309,7 @@ impl Compiler {
   fn grouping(&mut self) {
     // check if this is actually a unit
     if let Some(TokenType::RightParen) = self.parser.current_type() {
+      self.parser.advance();
       self.emit_opcode(OpCode::Tuple(0));
       return;
     }

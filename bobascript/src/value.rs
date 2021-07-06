@@ -79,7 +79,7 @@ impl TryInto<String> for Value {
         "({})",
         tuple
           .iter()
-          .map(|v| v.clone().try_into().unwrap())
+          .map(|v| format!("{}", v))
           .collect::<Vec<String>>()
           .join(", ")
       )),
