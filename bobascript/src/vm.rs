@@ -1,6 +1,4 @@
-use std::{
-  cell::RefCell, collections::HashMap, convert::TryInto, iter::repeat, mem::discriminant, rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, convert::TryInto, iter::repeat, rc::Rc};
 
 use thiserror::Error;
 
