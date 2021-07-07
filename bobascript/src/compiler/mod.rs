@@ -647,31 +647,28 @@ impl Compiler {
   fn end_scope(&mut self) {
     *self.scope_depth_mut() -= 1;
 
-    let mut count: usize = 0;
+    // let mut count: usize = 0;
     for i in (0..self.locals().len()).rev() {
       if self.locals()[i].depth > self.scope_depth() {
         self.locals_mut().remove(i);
-        count += 1;
+        if self.locals()[i].is_captured {
+          self.emit_opcode(OpCode::CloseUpvalue);
+        } else {
+          self.emit_opcode(OpCode::Pop);
+        }
+        // count += 1;
       } else {
         break;
       }
     }
 
-    let local_len = self.locals().len();
-    for i in (0..local_len).rev() {
-      if self.locals()[i].is_captured {
-        self.emit_opcode(OpCode::CloseUpvalue);
-      } else {
-        self.emit_opcode(OpCode::Pop);
-      }
-      /* todo: fix this so PopN isn't useless
-      else if count == 1 {
-        self.emit_opcode(OpCode::Pop);
-      } else if count > 1 {
-        self.emit_opcode(OpCode::PopN(count));
-      }
-      */
+    /* todo: fix this so PopN isn't useless
+    if count == 1 {
+      self.emit_opcode(OpCode::Pop);
+    } else if count > 1 {
+      self.emit_opcode(OpCode::PopN(count));
     }
+    */
   }
 
   fn parse_variable(&mut self, err: CompileError) -> usize {
