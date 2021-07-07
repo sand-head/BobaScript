@@ -55,10 +55,18 @@ pub enum Value {
   Closure(Closure),
 }
 
-impl Value {}
 impl Value {
   pub fn get_unit() -> Value {
     Value::Tuple(vec![].into_boxed_slice())
+  }
+
+  pub fn equal(&self, b: &Value) -> bool {
+    match (self, b) {
+      (Value::Number(a), Value::Number(b)) => *a == *b,
+      (Value::Boolean(a), Value::Boolean(b)) => *a == *b,
+      (Value::String(a), Value::String(b)) => *a == *b,
+      _ => false,
+    }
   }
 }
 

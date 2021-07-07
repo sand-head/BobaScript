@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
   chunk::{JumpDirection, OpCode},
-  compiler::Compiler,
+  compiler::{compile, compile_expr},
   debug::disassemble_instruction,
   value::{Closure, Function, NativeFunction, Upvalue, Value},
   InterpretResult,
@@ -82,8 +82,28 @@ impl VM {
   where
     S: Into<String>,
   {
-    let mut compiler = Compiler::new();
-    let function = compiler.compile(source.into())?;
+    let function = compile(source)?;
+
+    self.push(Value::Function(function.clone()));
+    let closure = Closure {
+      function,
+      upvalues: Vec::new(),
+    };
+    self.pop();
+    self.push(Value::Closure(closure.clone()));
+    self.call(closure, 0)?;
+
+    let result = self.run();
+    self.stack.clear();
+    self.frames.clear();
+    result
+  }
+
+  pub fn evaluate<S>(&mut self, expression: S) -> InterpretResult<Value>
+  where
+    S: Into<String>,
+  {
+    let function = compile_expr(expression)?;
 
     self.push(Value::Function(function.clone()));
     let closure = Closure {
@@ -150,15 +170,6 @@ impl VM {
       .try_into()?;
     self.pop();
     Ok(value)
-  }
-
-  fn values_equal(&self, a: Value, b: Value) -> bool {
-    match (a, b) {
-      (Value::Number(a), Value::Number(b)) => a == b,
-      (Value::Boolean(a), Value::Boolean(b)) => a == b,
-      (Value::String(a), Value::String(b)) => a == b,
-      _ => false,
-    }
   }
 
   fn call_value(&mut self, callee: Value, arg_count: u8) -> InterpretResult<()> {
@@ -329,7 +340,7 @@ impl VM {
         OpCode::Equal => {
           let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
           let a = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
-          let value = self.values_equal(a, b);
+          let value = Value::equal(&a, &b);
           self.push(Value::Boolean(value));
         }
         OpCode::GreaterThan => {

@@ -32,7 +32,7 @@ pub enum InterpretError {
 
 #[cfg(test)]
 mod tests {
-  use crate::vm::VM;
+  use crate::{value::Value, vm::VM};
 
   #[test]
   fn no_type_error_when_concat_string_and_block_expr() {
@@ -53,14 +53,14 @@ mod tests {
           fib(n - 2) + fib(n - 1)
         }
       }
-
-      log fib(10);
       "#,
     );
-    println!("{:?}", result);
     assert!(result.is_ok());
-    // let value = result.unwrap();
-    // assert_eq!(value, Value::Number(55));
+
+    let result = vm.evaluate("fib(10)");
+    println!("eval result: {:?}", result);
+    let value = result.unwrap();
+    assert!(Value::equal(&value, &Value::Number(55.0)));
   }
 
   #[test]
@@ -72,19 +72,18 @@ mod tests {
       fn outer() {
         let x = "outside";
         fn inner() {
-          log x;
+          x
         }
-        inner();
+        inner()
       }
-
-      outer();
       "#,
     );
-
-    println!("{:?}", result);
     assert!(result.is_ok());
-    // let value = result.unwrap();
-    // assert_eq!(value, Value::get_unit());
+
+    let result = vm.evaluate("outer()");
+    println!("eval result: {:?}", result);
+    let value = result.unwrap();
+    assert!(Value::equal(&value, &Value::String("outside".to_string())));
   }
 
   #[test]
@@ -96,19 +95,19 @@ mod tests {
       fn outer() {
         let x = "outside";
         fn inner() {
-          log x;
+          x
         }
         inner
       }
 
       let closure = outer();
-      closure();
       "#,
     );
-
-    println!("{:?}", result);
     assert!(result.is_ok());
-    // let value = result.unwrap();
-    // assert_eq!(value, Value::get_unit());
+
+    let result = vm.evaluate("closure()");
+    println!("eval result: {:?}", result);
+    let value = result.unwrap();
+    assert!(Value::equal(&value, &Value::String("outside".to_string())));
   }
 }
