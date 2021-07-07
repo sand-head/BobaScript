@@ -196,9 +196,19 @@ impl VM {
   }
 
   fn close_upvalues(&mut self, last_idx: usize) {
-    let value = self.peek(last_idx).unwrap();
-    if let Some(upvalue) = self.find_upvalue(last_idx) {
-      if let Upvalue::Open(_) = *upvalue.borrow_mut() {
+    for upvalue in self.upvalues.iter() {
+      let replace = if let Upvalue::Open(idx) = *upvalue.borrow() {
+        if idx >= last_idx {
+          Some(idx)
+        } else {
+          None
+        }
+      } else {
+        None
+      };
+
+      if let Some(idx) = replace {
+        let value = &self.stack[idx];
         upvalue.replace(Upvalue::Closed(value.clone()));
       }
     }
@@ -435,6 +445,7 @@ impl VM {
         }
         OpCode::Return => {
           let result = self.pop().unwrap_or_else(|| Value::get_unit());
+          self.close_upvalues(self.frame().slots_start);
           if self.frames.len() == 1 {
             // if this is the last frame, pop it and break the loop
             self.frames.pop();
