@@ -62,4 +62,53 @@ mod tests {
     // let value = result.unwrap();
     // assert_eq!(value, Value::Number(55));
   }
+
+  #[test]
+  fn closures_with_open_upvalues_work() {
+    let mut vm = VM::new();
+
+    let result = vm.interpret(
+      r#"
+      fn outer() {
+        let x = "outside";
+        fn inner() {
+          log x;
+        }
+        inner();
+      }
+
+      outer();
+      "#,
+    );
+
+    println!("{:?}", result);
+    assert!(result.is_ok());
+    // let value = result.unwrap();
+    // assert_eq!(value, Value::get_unit());
+  }
+
+  #[test]
+  fn closures_with_closed_upvalues_work() {
+    let mut vm = VM::new();
+
+    let result = vm.interpret(
+      r#"
+      fn outer() {
+        let x = "outside";
+        fn inner() {
+          log x;
+        }
+        inner
+      }
+
+      let closure = outer();
+      closure();
+      "#,
+    );
+
+    println!("{:?}", result);
+    assert!(result.is_ok());
+    // let value = result.unwrap();
+    // assert_eq!(value, Value::get_unit());
+  }
 }

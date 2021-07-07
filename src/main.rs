@@ -38,7 +38,7 @@ fn main() -> InterpretResult<()> {
 
   // create our virtual machine
   let mut vm = VM::new();
-  vm.add_log_handler(&log_handler);
+  vm.add_log_handler(Box::new(log_handler));
 
   println!("Howdy! Welcome to the BobaScript REPL, enjoy your stay.");
   loop {

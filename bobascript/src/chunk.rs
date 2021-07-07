@@ -13,6 +13,8 @@ pub enum OpCode {
   SetLocal(usize),
   GetGlobal(usize),
   SetGlobal(usize),
+  GetUpvalue(usize),
+  SetUpvalue(usize),
   Equal,
   GreaterThan,
   LessThan,
@@ -27,6 +29,8 @@ pub enum OpCode {
   Jump(JumpDirection, usize),
   JumpIfFalse(usize),
   Call(u8),
+  Closure(usize, Vec<Upvalue>),
+  CloseUpvalue,
   Return,
 }
 
@@ -34,6 +38,12 @@ pub enum OpCode {
 pub enum JumpDirection {
   Forwards,
   Backwards,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Upvalue {
+  Local(usize),
+  Upvalue(usize),
 }
 
 #[derive(Debug)]

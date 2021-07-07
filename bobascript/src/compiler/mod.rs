@@ -8,7 +8,7 @@ use self::{
   scanner::{Token, TokenType},
 };
 use crate::{
-  chunk::{Chunk, JumpDirection, OpCode},
+  chunk::{Chunk, JumpDirection, OpCode, Upvalue},
   debug::disassemble_chunk,
   parse_both, parse_infix, parse_none, parse_prefix,
   value::{Function, Value},
@@ -44,6 +44,7 @@ struct Local {
   name: Token,
   // todo: change this so we don't use -1 for uninitialized locals
   depth: i32,
+  is_captured: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -57,6 +58,7 @@ pub struct CompileContext {
   function: Function,
   fn_type: FunctionType,
   locals: Vec<Local>,
+  upvalues: Vec<Upvalue>,
   scope_depth: i32,
 }
 impl CompileContext {
@@ -71,9 +73,27 @@ impl CompileContext {
           line: 0,
         },
         depth: 0,
+        is_captured: false,
       }],
+      upvalues: Vec::new(),
       scope_depth: 0,
     }
+  }
+
+  fn resolve_local(&self, name: &String) -> CompileResult<Option<usize>> {
+    for i in (0..self.locals.len()).rev() {
+      if name == &self.locals[i].name.lexeme {
+        return if self.locals[i].depth == -1 {
+          Err(CompileError::VariableDoesNotExist(
+            self.locals[i].name.lexeme.clone(),
+          ))
+        } else {
+          // println!("yeah we got a {} at index {}", name, i);
+          Ok(Some(i))
+        };
+      }
+    }
+    Ok(None)
   }
 }
 
@@ -108,19 +128,7 @@ impl Compiler {
   }
 
   fn push_context(&mut self, fn_type: FunctionType) {
-    self.contexts.push(CompileContext {
-      function: Function::default(),
-      fn_type,
-      locals: vec![Local {
-        name: Token {
-          token_type: TokenType::Identifier,
-          lexeme: "".to_string(),
-          line: 0,
-        },
-        depth: 0,
-      }],
-      scope_depth: 0,
-    });
+    self.contexts.push(CompileContext::new(fn_type));
   }
 
   fn pop_context(&mut self) -> Option<CompileContext> {
@@ -412,7 +420,7 @@ impl Compiler {
     }
 
     let idx = self.make_constant(Value::Function(Rc::new(context.function)));
-    self.emit_opcode(OpCode::Constant(idx));
+    self.emit_opcode(OpCode::Closure(idx, context.upvalues));
   }
 
   fn if_expr(&mut self) {
@@ -648,10 +656,21 @@ impl Compiler {
         break;
       }
     }
-    if count == 1 {
-      self.emit_opcode(OpCode::Pop);
-    } else if count > 1 {
-      self.emit_opcode(OpCode::PopN(count));
+
+    let local_len = self.locals().len();
+    for i in (0..local_len).rev() {
+      if self.locals()[i].is_captured {
+        self.emit_opcode(OpCode::CloseUpvalue);
+      } else {
+        self.emit_opcode(OpCode::Pop);
+      }
+      /* todo: fix this so PopN isn't useless
+      else if count == 1 {
+        self.emit_opcode(OpCode::Pop);
+      } else if count > 1 {
+        self.emit_opcode(OpCode::PopN(count));
+      }
+      */
     }
   }
 
@@ -703,7 +722,11 @@ impl Compiler {
           .parser
           .set_error(CompileError::VariableAlreadyExists(name.lexeme.clone()));
       } else {
-        self.locals_mut().push(Local { name, depth: -1 });
+        self.locals_mut().push(Local {
+          name,
+          depth: -1,
+          is_captured: false,
+        });
       }
     }
   }
@@ -712,24 +735,74 @@ impl Compiler {
     self.make_constant(Value::String(lexeme))
   }
 
-  fn resolve_local(&mut self, name: &String) -> Option<usize> {
-    for i in (0..self.locals().len()).rev() {
-      if name == &self.locals()[i].name.lexeme {
-        if self.locals()[i].depth == -1 {
-          self.parser.set_error(CompileError::VariableDoesNotExist(
-            self.locals()[i].name.lexeme.clone(),
-          ));
-        }
-        // println!("yeah we got a {} at index {}", name, i);
-        return Some(i);
+  fn resolve_local(&mut self, name: &String, context_idx: usize) -> Option<usize> {
+    let context = self.contexts.iter_mut().nth_back(context_idx);
+    let context = match context {
+      Some(c) => c,
+      // we've run out of compile contexts
+      None => return None,
+    };
+
+    match context.resolve_local(name) {
+      Ok(local) => local,
+      Err(err) => {
+        self.parser.set_error(err);
+        None
       }
     }
-    None
+  }
+
+  fn add_upvalue(&mut self, index: usize, is_local: bool, context_idx: usize) -> usize {
+    // make sure we don't already have the upvalue before adding
+    let upvalues = &mut self
+      .contexts
+      .iter_mut()
+      .nth_back(context_idx)
+      .unwrap()
+      .upvalues;
+    for i in 0..upvalues.len() {
+      let upvalue = upvalues[i];
+      if let Upvalue::Local(local_index) = upvalue {
+        if local_index == index {
+          return i;
+        }
+      }
+    }
+
+    upvalues.push(if is_local {
+      Upvalue::Local(index)
+    } else {
+      Upvalue::Upvalue(index)
+    });
+    upvalues.len() - 1
+  }
+
+  fn resolve_upvalue(&mut self, name: &String, context_idx: usize) -> Option<usize> {
+    if let Some(idx) = self.resolve_local(name, context_idx + 1) {
+      self
+        .contexts
+        .iter_mut()
+        .nth_back(context_idx + 1)
+        .unwrap()
+        .locals[idx]
+        .is_captured = true;
+      Some(self.add_upvalue(idx, true, context_idx))
+    } else if context_idx + 1 >= self.contexts.len() {
+      // if we continue here, we'd get stuck in an infinite loop until the stack overflows
+      // this is because we are out of contexts to check
+      None
+    } else if let Some(idx) = self.resolve_upvalue(name, context_idx + 1) {
+      Some(self.add_upvalue(idx, false, context_idx))
+    } else {
+      None
+    }
   }
 
   fn named_variable(&mut self, lexeme: String, can_assign: bool) {
-    let (get_op, set_op) = if let Some(idx) = self.resolve_local(&lexeme) {
+    let (get_op, set_op) = if let Some(idx) = self.resolve_local(&lexeme, 0) {
       (OpCode::GetLocal(idx), OpCode::SetLocal(idx))
+    } else if let Some(idx) = self.resolve_upvalue(&lexeme, 0) {
+      (OpCode::GetUpvalue(idx), OpCode::SetUpvalue(idx))
     } else {
       let idx = self.identifier_constant(lexeme);
       (OpCode::GetGlobal(idx), OpCode::SetGlobal(idx))

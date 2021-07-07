@@ -27,6 +27,23 @@ impl fmt::Debug for NativeFunction {
   }
 }
 
+#[derive(Clone)]
+pub struct Closure {
+  pub function: Rc<Function>,
+  pub upvalues: Vec<Rc<RefCell<Upvalue>>>,
+}
+impl fmt::Debug for Closure {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "<closure {}>", self.function.name)
+  }
+}
+
+#[derive(Debug, Clone)]
+pub enum Upvalue {
+  Open(usize),
+  Closed(Value),
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
   Tuple(Box<[Value]>),
@@ -35,7 +52,10 @@ pub enum Value {
   String(String),
   Function(Rc<Function>),
   NativeFunction(Rc<RefCell<NativeFunction>>),
+  Closure(Closure),
 }
+
+impl Value {}
 impl Value {
   pub fn get_unit() -> Value {
     Value::Tuple(vec![].into_boxed_slice())
@@ -87,8 +107,11 @@ impl TryInto<String> for Value {
       Self::Boolean(bool) => Ok(format!("{}", bool)),
       Self::String(str) => Ok(str),
       Self::Function(function) if function.name.len() > 0 => Ok(format!("<fn {}>", function.name)),
-      Self::Function(_) => Ok("<script>".to_string()),
       Self::NativeFunction(native_fn) => Ok(format!("{:?}", native_fn)),
+      Self::Closure(closure) if closure.function.name.len() > 0 => {
+        Ok(format!("<fn {}>", closure.function.name))
+      }
+      Self::Function(_) | Self::Closure(_) => Ok("<script>".to_string()),
     }
   }
 }
@@ -96,13 +119,13 @@ impl TryInto<Rc<Function>> for Value {
   type Error = RuntimeError;
 
   fn try_into(self) -> Result<Rc<Function>, Self::Error> {
-    if let Value::Function(function) = self {
-      Ok(function)
-    } else {
-      Err(RuntimeError::TypeError {
+    match self {
+      Value::Function(function) => Ok(function),
+      Value::Closure(closure) => Ok(closure.function),
+      _ => Err(RuntimeError::TypeError {
         expected: "function",
         found: self,
-      })
+      }),
     }
   }
 }

@@ -6,7 +6,7 @@ use crate::{
   chunk::{JumpDirection, OpCode},
   compiler::Compiler,
   debug::disassemble_instruction,
-  value::{Function, NativeFunction, Value},
+  value::{Closure, Function, NativeFunction, Upvalue, Value},
   InterpretResult,
 };
 
@@ -41,28 +41,30 @@ pub enum RuntimeError {
 }
 
 struct CallFrame {
-  function: Rc<Function>,
+  closure: Closure,
   ip: usize,
   slots_start: usize,
 }
 
-pub struct VM<'a> {
-  log_handler: Option<&'a dyn Fn(Value) -> ()>,
+pub struct VM {
+  log_handler: Option<Box<dyn FnMut(Value) -> ()>>,
   frames: Vec<CallFrame>,
   stack: Vec<Value>,
   globals: HashMap<String, Value>,
+  upvalues: Vec<Rc<RefCell<Upvalue>>>,
 }
-impl<'a> VM<'a> {
+impl VM {
   pub fn new() -> Self {
     Self {
       log_handler: None,
       frames: Vec::with_capacity(64),
       stack: Vec::with_capacity(256),
       globals: HashMap::new(),
+      upvalues: Vec::new(),
     }
   }
 
-  pub fn add_log_handler(&mut self, handler: &'a dyn Fn(Value) -> ()) {
+  pub fn add_log_handler(&mut self, handler: Box<dyn FnMut(Value) -> ()>) {
     self.log_handler = Some(handler);
   }
 
@@ -84,7 +86,13 @@ impl<'a> VM<'a> {
     let function = compiler.compile(source.into())?;
 
     self.push(Value::Function(function.clone()));
-    self.call(function, 0)?;
+    let closure = Closure {
+      function,
+      upvalues: Vec::new(),
+    };
+    self.pop();
+    self.push(Value::Closure(closure.clone()));
+    self.call(closure, 0)?;
 
     let result = self.run();
     self.stack.clear();
@@ -155,8 +163,8 @@ impl<'a> VM<'a> {
 
   fn call_value(&mut self, callee: Value, arg_count: u8) -> InterpretResult<()> {
     match callee {
-      Value::Function(function) => {
-        self.call(function, arg_count)?;
+      Value::Closure(closure) => {
+        self.call(closure, arg_count)?;
         Ok(())
       }
       Value::NativeFunction(native_fn) => {
@@ -170,16 +178,42 @@ impl<'a> VM<'a> {
     }
   }
 
-  fn call(&mut self, function: Rc<Function>, arg_count: u8) -> InterpretResult<()> {
-    if arg_count != function.arity {
-      return Err(RuntimeError::IncorrectParameterCount(function.arity, arg_count).into());
+  fn find_upvalue(&self, idx: usize) -> Option<&Rc<RefCell<Upvalue>>> {
+    self.upvalues.iter().find(|&up| match *up.borrow() {
+      Upvalue::Open(local) => idx == local,
+      Upvalue::Closed(_) => false,
+    })
+  }
+
+  fn capture_upvalue(&mut self, idx: usize) -> Rc<RefCell<Upvalue>> {
+    if let Some(upvalue) = self.find_upvalue(idx) {
+      upvalue.clone()
+    } else {
+      let upvalue = Rc::new(RefCell::new(Upvalue::Open(idx)));
+      self.upvalues.push(upvalue.clone());
+      upvalue
+    }
+  }
+
+  fn close_upvalues(&mut self, last_idx: usize) {
+    let value = self.peek(last_idx).unwrap();
+    if let Some(upvalue) = self.find_upvalue(last_idx) {
+      if let Upvalue::Open(_) = *upvalue.borrow_mut() {
+        upvalue.replace(Upvalue::Closed(value.clone()));
+      }
+    }
+  }
+
+  fn call(&mut self, closure: Closure, arg_count: u8) -> InterpretResult<()> {
+    if arg_count != closure.function.arity {
+      return Err(RuntimeError::IncorrectParameterCount(closure.function.arity, arg_count).into());
     }
     if self.frames.len() == 64 {
       return Err(RuntimeError::StackOverflow.into());
     }
 
     self.frames.push(CallFrame {
-      function,
+      closure,
       ip: 0,
       slots_start: self.stack.len() - 1 - (arg_count as usize),
     });
@@ -190,7 +224,7 @@ impl<'a> VM<'a> {
     loop {
       let (instruction, line) = {
         let frame = self.frame();
-        let instruction = frame.function.chunk.code[frame.ip].clone();
+        let instruction = frame.closure.function.chunk.code[frame.ip].clone();
         self.frame_mut().ip += 1;
         instruction
       };
@@ -202,7 +236,7 @@ impl<'a> VM<'a> {
         }
         println!();
         disassemble_instruction(
-          &self.frame().function.chunk,
+          &self.frame().closure.function.chunk,
           &instruction,
           &line,
           self.frame().ip,
@@ -219,7 +253,7 @@ impl<'a> VM<'a> {
           self.push(Value::Tuple(tuple.into_boxed_slice()));
         }
         OpCode::Constant(idx) => {
-          let constant = self.frame().function.chunk.constants[idx].clone();
+          let constant = self.frame().closure.function.chunk.constants[idx].clone();
           self.push(constant);
         }
         OpCode::True => self.push(Value::Boolean(true)),
@@ -230,22 +264,22 @@ impl<'a> VM<'a> {
         OpCode::PopN(count) => {
           self.pop_n(count);
         }
-        OpCode::DefineGlobal(global) => {
-          let global = self.frame().function.chunk.constants[global].clone();
+        OpCode::DefineGlobal(idx) => {
+          let global = self.frame().closure.function.chunk.constants[idx].clone();
           let name: String = global.try_into()?;
           self.globals.insert(name, self.peek(0).unwrap().clone());
           self.pop();
         }
-        OpCode::GetLocal(local) => {
-          let local = self.stack[self.frame().slots_start + local].clone();
+        OpCode::GetLocal(idx) => {
+          let local = self.stack[self.frame().slots_start + idx].clone();
           self.push(local);
         }
-        OpCode::SetLocal(local) => {
+        OpCode::SetLocal(idx) => {
           let slot_offset = self.frame().slots_start;
-          self.stack[slot_offset + local] = self.peek(0).unwrap().clone();
+          self.stack[slot_offset + idx] = self.peek(0).unwrap().clone();
         }
-        OpCode::GetGlobal(global) => {
-          let global = self.frame().function.chunk.constants[global].clone();
+        OpCode::GetGlobal(idx) => {
+          let global = self.frame().closure.function.chunk.constants[idx].clone();
           let name: String = global.try_into()?;
 
           let value = self
@@ -256,8 +290,8 @@ impl<'a> VM<'a> {
 
           self.push(value);
         }
-        OpCode::SetGlobal(global) => {
-          let global = self.frame().function.chunk.constants[global].clone();
+        OpCode::SetGlobal(idx) => {
+          let global = self.frame().closure.function.chunk.constants[idx].clone();
           let name: String = global.try_into()?;
           let new_value = self.peek(0).unwrap().clone();
 
@@ -265,6 +299,22 @@ impl<'a> VM<'a> {
             .globals
             .get_mut(&name)
             .ok_or_else(|| RuntimeError::UndefinedVariable(name))? = new_value;
+        }
+        OpCode::GetUpvalue(idx) => {
+          let upvalue = &self.frame().closure.upvalues[idx];
+          let value = match &*upvalue.borrow() {
+            Upvalue::Open(idx) => self.stack[*idx].clone(),
+            Upvalue::Closed(value) => value.clone(),
+          };
+          self.push(value);
+        }
+        OpCode::SetUpvalue(idx) => {
+          let new_value = self.peek(0).unwrap().clone();
+          let upvalue = &self.frame().closure.upvalues[idx].clone();
+          match &mut *upvalue.borrow_mut() {
+            Upvalue::Open(idx) => self.stack[*idx] = new_value,
+            Upvalue::Closed(value) => *value = new_value,
+          };
         }
         OpCode::Equal => {
           let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
@@ -339,8 +389,8 @@ impl<'a> VM<'a> {
         }
         OpCode::Log => {
           let value = self.peek(0).unwrap().clone();
-          if let Some(handler) = self.log_handler {
-            handler(value);
+          if let Some(handler) = &mut self.log_handler {
+            (handler)(value);
           } else {
             println!("{}", value);
           }
@@ -357,6 +407,31 @@ impl<'a> VM<'a> {
         }
         OpCode::Call(args) => {
           self.call_value(self.peek(args as usize).unwrap().clone(), args)?;
+        }
+        OpCode::Closure(idx, upvalues) => {
+          let function: Rc<Function> = self.frame().closure.function.chunk.constants[idx]
+            .clone()
+            .try_into()
+            .unwrap();
+          let closure = Closure {
+            function,
+            upvalues: upvalues
+              .iter()
+              .map(|up| match up {
+                crate::chunk::Upvalue::Local(idx) => {
+                  self.capture_upvalue(self.frame().slots_start + idx)
+                }
+                crate::chunk::Upvalue::Upvalue(idx) => {
+                  Rc::clone(&self.frame().closure.upvalues[*idx])
+                }
+              })
+              .collect(),
+          };
+          self.push(Value::Closure(closure));
+        }
+        OpCode::CloseUpvalue => {
+          self.close_upvalues(self.stack.len() - 1);
+          self.pop();
         }
         OpCode::Return => {
           let result = self.pop().unwrap_or_else(|| Value::get_unit());
