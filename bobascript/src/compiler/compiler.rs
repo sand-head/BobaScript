@@ -574,12 +574,12 @@ impl Compiler {
     // let mut count: usize = 0;
     for i in (0..self.locals().len()).rev() {
       if self.locals()[i].depth > self.scope_depth() {
-        self.locals_mut().remove(i);
         if self.locals()[i].is_captured {
           self.emit_opcode(OpCode::CloseUpvalue);
         } else {
           self.emit_opcode(OpCode::Pop);
         }
+        self.locals_mut().remove(i);
         // count += 1;
       } else {
         break;
