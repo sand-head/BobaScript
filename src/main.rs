@@ -38,7 +38,7 @@ fn main() -> InterpretResult<()> {
 
   // create our virtual machine
   let mut vm = VM::new();
-  vm.add_log_handler(&log_handler);
+  vm.add_log_handler(Box::new(log_handler));
 
   println!("Howdy! Welcome to the BobaScript REPL, enjoy your stay.");
   loop {
@@ -46,7 +46,7 @@ fn main() -> InterpretResult<()> {
       Ok(input) => {
         rl.add_history_entry(&input);
         match vm.interpret(input) {
-          Ok(Value::Unit) => {}
+          // Ok(Value::Tuple(tuple)) if tuple.len() == 0 => {}
           Ok(value) => println!("< {}", value),
           Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
         }

@@ -1,6 +1,6 @@
 use num_enum::{FromPrimitive, IntoPrimitive};
 
-use super::Compiler;
+use super::compiler::Compiler;
 
 #[macro_export]
 macro_rules! parse_prefix {

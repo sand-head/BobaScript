@@ -8,6 +8,7 @@ edition = "2018"
 
 [features]
 debug = []
+super_debug = ["debug"]
 
 [dependencies]
 num_enum = "0.5"

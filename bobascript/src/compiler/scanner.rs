@@ -39,7 +39,6 @@ pub enum TokenType {
   LessThan,
   LessEqual,
   // literals:
-  Unit,
   Identifier,
   String,
   Number,
@@ -53,13 +52,16 @@ pub enum TokenType {
   Else,
   Enum,
   False,
+  Fn,
   For,
   If,
   Let,
   Log,
+  Match,
   Or,
   Return,
   Super,
+  Switch,
   This,
   True,
   While,
@@ -97,11 +99,7 @@ impl Scanner {
       '0'..='9' => Ok(self.make_number()),
       'a'..='z' | 'A'..='Z' | '_' => Ok(self.make_identifier()),
       '"' => Ok(self.make_string()?),
-      '(' => Ok(if self.current_matches(')') {
-        self.make_token(TokenType::Unit)
-      } else {
-        self.make_token(TokenType::LeftParen)
-      }),
+      '(' => Ok(self.make_token(TokenType::LeftParen)),
       ')' => Ok(self.make_token(TokenType::RightParen)),
       '{' => Ok(self.make_token(TokenType::LeftBrace)),
       '}' => Ok(self.make_token(TokenType::RightBrace)),
@@ -278,6 +276,7 @@ impl Scanner {
       },
       'f' if self.current - self.start > 1 => match self.source[self.start + 1] {
         'a' => self.check_keyword(2, 3, "lse", TokenType::False),
+        'n' => self.check_keyword(2, 0, "", TokenType::Fn),
         'o' => self.check_keyword(2, 1, "r", TokenType::For),
         _ => TokenType::Identifier,
       },
@@ -287,9 +286,14 @@ impl Scanner {
         'o' => self.check_keyword(2, 1, "g", TokenType::Log),
         _ => TokenType::Identifier,
       },
+      'm' => self.check_keyword(1, 4, "atch", TokenType::Match),
       'o' => self.check_keyword(1, 1, "r", TokenType::Or),
       'r' => self.check_keyword(1, 5, "eturn", TokenType::Return),
-      's' => self.check_keyword(1, 4, "uper", TokenType::Super),
+      's' if self.current - self.start > 1 => match self.source[self.start + 1] {
+        'u' => self.check_keyword(2, 3, "per", TokenType::Super),
+        'w' => self.check_keyword(2, 4, "itch", TokenType::Switch),
+        _ => TokenType::Identifier,
+      },
       't' if self.current - self.start > 1 => match self.source[self.start + 1] {
         'h' => self.check_keyword(2, 2, "is", TokenType::This),
         'r' => self.check_keyword(2, 2, "ue", TokenType::True),

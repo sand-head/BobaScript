@@ -1,8 +1,8 @@
 use crate::value::Value;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpCode {
-  Unit,
+  Tuple(u8),
   Constant(usize),
   True,
   False,
@@ -13,6 +13,8 @@ pub enum OpCode {
   SetLocal(usize),
   GetGlobal(usize),
   SetGlobal(usize),
+  GetUpvalue(usize),
+  SetUpvalue(usize),
   Equal,
   GreaterThan,
   LessThan,
@@ -26,6 +28,9 @@ pub enum OpCode {
   Log,
   Jump(JumpDirection, usize),
   JumpIfFalse(usize),
+  Call(u8),
+  Closure(usize, Vec<Upvalue>),
+  CloseUpvalue,
   Return,
 }
 
@@ -35,6 +40,13 @@ pub enum JumpDirection {
   Backwards,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Upvalue {
+  Local(usize),
+  Upvalue(usize),
+}
+
+#[derive(Debug)]
 pub struct Chunk {
   pub code: Vec<(OpCode, usize)>,
   pub constants: Vec<Value>,
