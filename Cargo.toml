@@ -7,12 +7,13 @@ edition = "2018"
 [workspace]
 members = [
     ".",
-    "bobascript"
+    "crates/bobascript",
+    "crates/bobascript-ast"
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-bobascript = { path = "bobascript", features = ["super_debug"] }
+bobascript = { path = "crates/bobascript", features = ["super_debug"] }
 termcolor = "1.1"
 rustyline = "8.2"
 rustyline-derive = "0.4"

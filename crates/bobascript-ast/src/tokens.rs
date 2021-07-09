@@ -1,0 +1,70 @@
+#[derive(Debug, Clone)]
+pub struct Token {
+  pub token_type: TokenType,
+  pub line: usize,
+  pub lexeme: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenType {
+  // brackets & parentheses:
+  LeftParen,
+  RightParen,
+  LeftBrace,
+  RightBrace,
+  LeftBracket,
+  RightBracket,
+  // single-character tokens:
+  Asterisk,
+  Carrot,
+  Comma,
+  DollarSign,
+  Minus,
+  Period,
+  Plus,
+  Semicolon,
+  Slash,
+  // 2+ character tokens:
+  Not,
+  NotEqual,
+  Equal,
+  Assign,
+  AddAssign,
+  SubtractAssign,
+  MultiplyAssign,
+  DivideAssign,
+  GreaterThan,
+  GreaterEqual,
+  LessThan,
+  LessEqual,
+  // literals:
+  Identifier,
+  String,
+  Number,
+  // keywords:
+  And,
+  Async,
+  Await,
+  Break,
+  Class,
+  Const,
+  Else,
+  Enum,
+  False,
+  Fn,
+  For,
+  If,
+  Let,
+  Log,
+  Match,
+  Or,
+  Return,
+  Super,
+  Switch,
+  This,
+  True,
+  While,
+  Yield,
+
+  EOF,
+}

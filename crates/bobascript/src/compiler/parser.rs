@@ -1,7 +1,6 @@
-use super::{
-  scanner::{Scanner, Token, TokenType},
-  CompileError,
-};
+use bobascript_ast::tokens::{Token, TokenType};
+
+use super::{scanner::Scanner, CompileError};
 
 pub struct Parser {
   scanner: Scanner,

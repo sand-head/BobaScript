@@ -1,9 +1,10 @@
 use std::rc::Rc;
 
+use bobascript_ast::tokens::TokenType;
+
 use super::{
   parser::Parser,
   rules::{ParseRule, Precedence},
-  scanner::TokenType,
   CompileContext, CompileError, CompileResult, FunctionType, Local,
 };
 use crate::{
@@ -625,23 +626,19 @@ impl Compiler {
   /// Adds a variable to the scope
   fn declare_variable(&mut self) {
     if self.scope_depth() > 0 {
-      let name = self.parser.previous().unwrap().clone();
-      // todo: this sucks
-      let mut name_exists = false;
-      for local in self.locals().iter().rev() {
-        if local.depth != -1 && local.depth < self.scope_depth() {
-          break;
-        }
-        if &name.lexeme == &local.name.lexeme {
-          name_exists = true;
-          break;
-        }
-      }
+      let name = self.parser.previous().unwrap().lexeme.clone();
+      let name_exists = self
+        .locals()
+        .iter()
+        .rev()
+        .filter(|local| local.depth != -1 && local.depth < self.scope_depth())
+        .find(|local| &name == &local.name)
+        .is_some();
 
       if name_exists {
         self
           .parser
-          .set_error(CompileError::VariableAlreadyExists(name.lexeme.clone()));
+          .set_error(CompileError::VariableAlreadyExists(name.clone()));
       } else {
         self.locals_mut().push(Local {
           name,

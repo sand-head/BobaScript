@@ -11,5 +11,6 @@ debug = []
 super_debug = ["debug"]
 
 [dependencies]
+bobascript-ast = { path = "../bobascript-ast" }
 num_enum = "0.5"
 thiserror = "1.0"

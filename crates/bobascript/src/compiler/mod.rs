@@ -2,10 +2,7 @@ use std::rc::Rc;
 
 use thiserror::Error;
 
-use self::{
-  compiler::Compiler,
-  scanner::{Token, TokenType},
-};
+use self::compiler::Compiler;
 use crate::{chunk::Upvalue, value::Function};
 
 mod compiler;
@@ -36,7 +33,7 @@ pub enum CompileError {
 }
 
 pub struct Local {
-  name: Token,
+  name: String,
   // todo: change this so we don't use -1 for uninitialized locals
   depth: i32,
   is_captured: bool,
@@ -62,11 +59,7 @@ impl CompileContext {
       function: Function::default(),
       fn_type,
       locals: vec![Local {
-        name: Token {
-          token_type: TokenType::Identifier,
-          lexeme: "".to_string(),
-          line: 0,
-        },
+        name: "".to_string(),
         depth: 0,
         is_captured: false,
       }],
@@ -77,10 +70,10 @@ impl CompileContext {
 
   fn resolve_local(&self, name: &String) -> CompileResult<Option<usize>> {
     for i in (0..self.locals.len()).rev() {
-      if name == &self.locals[i].name.lexeme {
+      if name == &self.locals[i].name {
         return if self.locals[i].depth == -1 {
           Err(CompileError::VariableDoesNotExist(
-            self.locals[i].name.lexeme.clone(),
+            self.locals[i].name.clone(),
           ))
         } else {
           // println!("yeah we got a {} at index {}", name, i);

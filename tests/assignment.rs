@@ -61,6 +61,7 @@ fn infix_operator() {
     a + b = "value";
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_err());
   assert_compile_err!(result, CompileError::InvalidAssignmentTarget);
 }
