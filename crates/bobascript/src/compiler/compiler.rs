@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use bobascript_ast::tokens::TokenType;
+use bobascript_parser::tokens::TokenType;
 
 use super::{
   parser::Parser,

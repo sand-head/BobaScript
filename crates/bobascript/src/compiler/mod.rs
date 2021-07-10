@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use bobascript_ast::SyntaxError;
+use bobascript_parser::SyntaxError;
 use thiserror::Error;
 
 use self::compiler::Compiler;

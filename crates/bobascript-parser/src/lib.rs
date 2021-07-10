@@ -1,3 +1,7 @@
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
+
 use thiserror::Error;
 
 pub mod ast;
@@ -13,3 +17,7 @@ pub enum SyntaxError {
   UnterminatedString(usize),
 }
 pub type Result<T> = std::result::Result<T, SyntaxError>;
+
+#[derive(Parser)]
+#[grammar = "bobascript.pest"]
+pub struct BobaScriptParser {}

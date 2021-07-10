@@ -1,4 +1,4 @@
-use bobascript_ast::{
+use bobascript_parser::{
   lexer::Lexer,
   tokens::{Token, TokenType},
 };
