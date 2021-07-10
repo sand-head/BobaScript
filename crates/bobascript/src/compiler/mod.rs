@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use bobascript_ast::SyntaxError;
 use thiserror::Error;
 
 use self::compiler::Compiler;
@@ -8,12 +9,13 @@ use crate::{chunk::Upvalue, value::Function};
 mod compiler;
 mod parser;
 mod rules;
-mod scanner;
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug, Error, Clone)]
 pub enum CompileError {
+  #[error("Syntax error: {0}")]
+  SyntaxError(#[from] SyntaxError),
   #[error("Unexpected character '{1}' on line {0}.")]
   UnexpectedCharacter(usize, char),
   #[error("Unterminated string on line {0}.")]

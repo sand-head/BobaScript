@@ -1,9 +1,12 @@
-use bobascript_ast::tokens::{Token, TokenType};
+use bobascript_ast::{
+  lexer::Lexer,
+  tokens::{Token, TokenType},
+};
 
-use super::{scanner::Scanner, CompileError};
+use super::CompileError;
 
 pub struct Parser {
-  scanner: Scanner,
+  lexer: Lexer,
   current: Option<Token>,
   previous: Option<Token>,
   pub error: Option<CompileError>,
@@ -12,7 +15,7 @@ pub struct Parser {
 impl Parser {
   pub fn new(source: String) -> Self {
     Self {
-      scanner: Scanner::new(source),
+      lexer: Lexer::new(source),
       current: None,
       previous: None,
       error: None,
@@ -42,14 +45,14 @@ impl Parser {
     }
 
     loop {
-      match self.scanner.scan_token() {
+      match self.lexer.scan_token() {
         Ok(token) => {
           self.current = Some(token);
           break;
         }
         Err(e) => {
           self.current = None;
-          self.set_error(e);
+          self.set_error(e.into());
         }
       }
     }
