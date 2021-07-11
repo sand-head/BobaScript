@@ -1,14 +1,17 @@
 use std::rc::Rc;
 
-use bobascript_parser::SyntaxError;
+use bobascript_parser::{
+  ast::{Ast, Expr},
+  SyntaxError,
+};
 use thiserror::Error;
 
 use self::compiler::Compiler;
 use crate::{chunk::Upvalue, value::Function};
 
 mod compiler;
-mod parser;
-mod rules;
+mod expressions;
+mod statements;
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
@@ -88,19 +91,13 @@ impl CompileContext {
 }
 
 /// Compiles the given source code and returns its resulting function.
-pub fn compile<S>(source: S) -> CompileResult<Rc<Function>>
-where
-  S: Into<String>,
-{
-  let mut compiler = Compiler::new(source);
-  compiler.compile()
+pub fn compile(ast: &Ast) -> CompileResult<Rc<Function>> {
+  let mut compiler = Compiler::new();
+  compiler.compile(ast)
 }
 
 /// Compiles a single expression and returns its resulting function.
-pub fn compile_expr<S>(expression: S) -> CompileResult<Rc<Function>>
-where
-  S: Into<String>,
-{
-  let mut compiler = Compiler::new(expression);
-  compiler.compile_expr()
+pub fn compile_expr(expression: &Box<Expr>) -> CompileResult<Rc<Function>> {
+  let mut compiler = Compiler::new();
+  compiler.compile_expr(expression)
 }

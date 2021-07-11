@@ -1,4 +1,4 @@
-pub type Ast = Vec<Stmt>;
+pub type Ast = Vec<Box<Stmt>>;
 
 #[derive(Debug)]
 pub enum Stmt {
@@ -40,6 +40,7 @@ pub enum Constant {
   Ident(String),
   Number(f64),
   String(String),
+  Tuple(Vec<Box<Expr>>),
 }
 
 #[derive(Debug)]

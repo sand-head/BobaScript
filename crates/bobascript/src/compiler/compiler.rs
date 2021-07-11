@@ -1,41 +1,27 @@
 use std::rc::Rc;
 
-use bobascript_parser::tokens::TokenType;
+use bobascript_parser::ast::{Ast, Expr, Stmt};
 
-use super::{
-  parser::Parser,
-  rules::{ParseRule, Precedence},
-  CompileContext, CompileError, CompileResult, FunctionType, Local,
-};
+use super::{CompileContext, CompileError, CompileResult, FunctionType, Local};
 use crate::{
   chunk::{Chunk, JumpDirection, OpCode, Upvalue},
   debug::disassemble_chunk,
-  parse_both, parse_infix, parse_none, parse_prefix,
   value::{Function, Value},
 };
 
 pub struct Compiler {
   contexts: Vec<CompileContext>,
-  parser: Parser,
 }
 impl Compiler {
-  pub fn new<S>(source: S) -> Self
-  where
-    S: Into<String>,
-  {
+  pub fn new() -> Self {
     Self {
       contexts: vec![CompileContext::new(FunctionType::TopLevel)],
-      parser: Parser::new(source.into()),
     }
   }
 
-  pub(super) fn compile(&mut self) -> CompileResult<Rc<Function>> {
-    self.parser.advance();
-    loop {
-      match self.parser.current_type() {
-        Some(TokenType::EOF) => break self.parser.advance(),
-        _ => self.statement(),
-      }
+  pub(super) fn compile(&mut self, ast: &Ast) -> CompileResult<Rc<Function>> {
+    for stmt in ast {
+      self.statement();
     }
 
     self.emit_opcode(OpCode::Tuple(0));
@@ -44,9 +30,17 @@ impl Compiler {
   }
 
   /// Compiles a single expression and returns its containing function.
-  pub(super) fn compile_expr(&mut self) -> CompileResult<Rc<Function>> {
-    self.parser.advance();
-    self.expression();
+  pub(super) fn compile_expr(&mut self, expr: &Box<Expr>) -> CompileResult<Rc<Function>> {
+    match **expr {
+      Expr::Log(_) => todo!(),
+      Expr::Block(_, _) => todo!(),
+      Expr::If(_, _, _) => todo!(),
+      Expr::While(_, _) => todo!(),
+      Expr::Binary(_, _, _) => todo!(),
+      Expr::Unary(_, _) => todo!(),
+      Expr::Call(_, _) => todo!(),
+      Expr::Constant(_) => todo!(),
+    };
 
     let function = self.end_compiler();
     self.parser.error.clone().map_or(Ok(function), |e| Err(e))
@@ -212,11 +206,6 @@ impl Compiler {
 
   fn expression(&mut self) {
     self.parse_precedence(Precedence::Assignment);
-  }
-
-  fn log_expr(&mut self) {
-    self.expression();
-    self.emit_opcode(OpCode::Log);
   }
 
   fn and(&mut self) {
@@ -785,42 +774,5 @@ impl Compiler {
     }
 
     Rc::new(context.function)
-  }
-}
-
-/// Gets the appropriate `ParseRule` for the given `TokenType`.
-fn get_rule(token_type: TokenType) -> ParseRule {
-  match token_type {
-    TokenType::LeftParen => parse_both!(|c, _| c.grouping(), |c, _| c.call(), Call),
-    TokenType::LeftBrace => parse_prefix!(|c, _| c.block(), None),
-
-    TokenType::Asterisk => parse_infix!(|c, _| c.binary(), Factor),
-    TokenType::Carrot => parse_infix!(|c, _| c.binary(), Exponent),
-    TokenType::Minus => parse_both!(|c, _| c.unary(), |c, _| c.binary(), Term),
-    TokenType::Plus => parse_infix!(|c, _| c.binary(), Term),
-    TokenType::Slash => parse_infix!(|c, _| c.binary(), Factor),
-
-    TokenType::Not => parse_prefix!(|c, _| c.unary(), None),
-    TokenType::NotEqual => parse_infix!(|c, _| c.binary(), Equality),
-    TokenType::Equal => parse_infix!(|c, _| c.binary(), Equality),
-    TokenType::GreaterThan => parse_infix!(|c, _| c.binary(), Comparison),
-    TokenType::GreaterEqual => parse_infix!(|c, _| c.binary(), Comparison),
-    TokenType::LessThan => parse_infix!(|c, _| c.binary(), Comparison),
-    TokenType::LessEqual => parse_infix!(|c, _| c.binary(), Comparison),
-
-    TokenType::Identifier => parse_prefix!(|c, can_assign| c.variable(can_assign), None),
-    TokenType::String => parse_prefix!(|c, _| c.string(), None),
-    TokenType::Number => parse_prefix!(|c, _| c.number(), None),
-
-    TokenType::And => parse_infix!(|c, _| c.and(), And),
-    TokenType::False => parse_prefix!(|c, _| c.literal(), None),
-    // TokenType::Fn => parse_prefix!(|c, _| c.fn_expr(), None),
-    TokenType::If => parse_prefix!(|c, _| c.if_expr(), None),
-    TokenType::Log => parse_prefix!(|c, _| c.log_expr(), None),
-    TokenType::Or => parse_infix!(|c, _| c.or(), Or),
-    TokenType::True => parse_prefix!(|c, _| c.literal(), None),
-    TokenType::While => parse_prefix!(|c, _| c.while_expr(), None),
-
-    _ => parse_none!(),
   }
 }

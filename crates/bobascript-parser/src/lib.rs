@@ -2,10 +2,7 @@ use lalrpop_util::lalrpop_mod;
 use thiserror::Error;
 
 pub mod ast;
-lalrpop_mod!(pub bobascript);
-pub mod lexer;
-pub mod parser;
-pub mod tokens;
+lalrpop_mod!(pub grammar);
 
 #[derive(Debug, Error, Clone)]
 pub enum SyntaxError {
@@ -17,7 +14,8 @@ pub enum SyntaxError {
 pub type Result<T> = std::result::Result<T, SyntaxError>;
 
 mod tests {
-  use crate::bobascript::{ExprParser, StmtParser};
+  #![allow(unused_imports)]
+  use crate::grammar::{ExprParser, StmtParser};
 
   #[test]
   fn parse_function_stmt() {

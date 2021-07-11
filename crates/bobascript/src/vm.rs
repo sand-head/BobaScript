@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, convert::TryInto, iter::repeat, rc::Rc};
 
+use bobascript_parser::grammar::{StmtParser, StmtsParser};
 use thiserror::Error;
 
 use crate::{
@@ -82,7 +83,11 @@ impl VM {
   where
     S: Into<String>,
   {
-    let function = compile(source)?;
+    let parser = StmtsParser::new();
+    let ast = parser
+      .parse(&source.into())
+      .map_err(|_| RuntimeError::Unknown)?;
+    let function = compile(&ast)?;
 
     self.push(Value::Function(function.clone()));
     let closure = Closure {
