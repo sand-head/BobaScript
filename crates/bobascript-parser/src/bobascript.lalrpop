@@ -27,7 +27,6 @@ Return: Box<Stmt> = {
 pub Expr: Box<Expr> = {
     Block,
     If,
-    Unary,
     Assignment,
 };
 Block: Box<Expr> = {
@@ -40,20 +39,34 @@ If: Box<Expr> = {
         Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
     },
 };
-Unary: Box<Expr> = {
-    "-" <Expr> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
-    "!" <Expr> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
-};
 
-// infix precedence stuff
+// precedence stuff
 
 Precedence<Op, Next>: Box<Expr> = {
     Precedence<Op, Next> Op Next => Box::new(Expr::Binary(<>)),
     Next,
 };
-Assignment = Precedence<AssignOp, Term>;
+
+Assignment = Precedence<AssignOp, Or>;
+Or = Precedence<OrOp, And>;
+And = Precedence<AndOp, Equality>;
+Equality = Precedence<EqualityOp, Comparison>;
+Comparison = Precedence<ComparisonOp, Term>;
 Term = Precedence<TermOp, Factor>;
-Factor = Precedence<FactorOp, Value>;
+Factor = Precedence<FactorOp, Exponent>;
+Exponent = Precedence<ExponentOp, Unary>;
+Unary: Box<Expr> = {
+    "-" <Call> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
+    "!" <Call> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
+    Call,
+};
+Call: Box<Expr> = {
+    <Primary> "()" => Box::new(Expr::Call(<>, vec![])),
+    Primary,
+}
+Primary: Box<Expr> = {
+    Value,
+};
 
 AssignOp: BinaryOp = {
     "=" => BinaryOp::Assign,
@@ -61,6 +74,18 @@ AssignOp: BinaryOp = {
     "-=" => BinaryOp::SubtractAssign,
     "*=" => BinaryOp::MultiplyAssign,
     "/=" => BinaryOp::DivideAssign,
+};
+OrOp: BinaryOp = { "or" => BinaryOp::Or };
+AndOp: BinaryOp = { "and" => BinaryOp::And };
+EqualityOp: BinaryOp = {
+    "==" => BinaryOp::Equal,
+    "!=" => BinaryOp::NotEqual,
+};
+ComparisonOp: BinaryOp = {
+    ">=" => BinaryOp::GreaterEqual,
+    "<=" => BinaryOp::LessEqual,
+    ">" => BinaryOp::GreaterThan,
+    "<" => BinaryOp::LessThan,
 };
 TermOp: BinaryOp = {
     "+" => BinaryOp::Add,
@@ -70,7 +95,7 @@ FactorOp: BinaryOp = {
     "*" => BinaryOp::Multiply,
     "/" => BinaryOp::Divide,
 };
-
+ExponentOp: BinaryOp = { "^" => BinaryOp::Exponent };
 
 // basic building blocks
 

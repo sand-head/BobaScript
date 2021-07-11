@@ -12,7 +12,7 @@ pub enum Stmt {
 #[derive(Debug)]
 pub enum Expr {
   Block(Vec<Box<Stmt>>, Option<Box<Expr>>),
-  Call(String, Vec<Box<Expr>>),
+  Call(Box<Expr>, Vec<Box<Expr>>),
   Unary(UnaryOp, Box<Expr>),
   Binary(Box<Expr>, BinaryOp, Box<Expr>),
   If(
@@ -38,15 +38,17 @@ pub enum BinaryOp {
   SubtractAssign,
   MultiplyAssign,
   DivideAssign,
+  Or,
+  And,
+  Equal,
+  NotEqual,
+  GreaterThan,
+  GreaterEqual,
+  LessThan,
+  LessEqual,
   Add,
   Subtract,
   Multiply,
   Divide,
   Exponent,
-  NotEqual,
-  Equal,
-  GreaterThan,
-  GreaterEqual,
-  LessThan,
-  LessEqual,
 }

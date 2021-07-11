@@ -75,10 +75,12 @@ mod tests {
 
   #[test]
   fn parse_if_expr() {
-    let expr = ExprParser::new().parse("if 3 {15 + 1; 3}").unwrap();
+    let expr = ExprParser::new()
+      .parse(r#"if 3 == "3" {15 + 1; 3}"#)
+      .unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      "If(Number(3.0), Block([Expression(Binary(Number(15.0), Add, Number(1.0)))], Some(Number(3.0))), None)"
+      r#"If(Binary(Number(3.0), Equal, String("\"3\"")), Block([Expression(Binary(Number(15.0), Add, Number(1.0)))], Some(Number(3.0))), None)"#
     );
 
     let expr = ExprParser::new().parse("if 3 {3} else if 6 {6}").unwrap();
