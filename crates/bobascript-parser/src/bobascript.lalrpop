@@ -1,0 +1,87 @@
+use std::str::FromStr;
+use crate::ast::{Stmt, Expr, BinaryOp, UnaryOp};
+
+grammar;
+
+// statements!
+
+pub Stmt: Box<Stmt> = {
+    Function,
+    Declaration,
+    Return,
+    <Expr> ";" => Box::new(Stmt::Expression(<>)),
+};
+Function: Box<Stmt> = {
+    "fn" <Ident> "()" <Block> => Box::new(Stmt::Function(<>)),
+};
+Declaration: Box<Stmt> = {
+    "const" <Ident> "=" <Expr> ";" => Box::new(Stmt::Const(<>)),
+    "let" <n:Ident> <v:("=" <Expr>)?> ";" => Box::new(Stmt::Let(<>)),
+};
+Return: Box<Stmt> = {
+    "return" <Expr?> ";" => Box::new(Stmt::Return(<>)),
+};
+
+// expressions!
+
+pub Expr: Box<Expr> = {
+    Block,
+    If,
+    Unary,
+    Assignment,
+};
+Block: Box<Expr> = {
+    "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
+};
+If: Box<Expr> = {
+    "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
+    "if" <c:Expr> <t:Block> "else" <f:Block> => Box::new(Expr::If(c, t, Some(f))),
+    "if" <c:Expr> <t:Block> "else" <f:If> => {
+        Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
+    },
+};
+Unary: Box<Expr> = {
+    "-" <Expr> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
+    "!" <Expr> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
+};
+
+// infix precedence stuff
+
+Precedence<Op, Next>: Box<Expr> = {
+    Precedence<Op, Next> Op Next => Box::new(Expr::Binary(<>)),
+    Next,
+};
+Assignment = Precedence<AssignOp, Term>;
+Term = Precedence<TermOp, Factor>;
+Factor = Precedence<FactorOp, Value>;
+
+AssignOp: BinaryOp = {
+    "=" => BinaryOp::Assign,
+    "+=" => BinaryOp::AddAssign,
+    "-=" => BinaryOp::SubtractAssign,
+    "*=" => BinaryOp::MultiplyAssign,
+    "/=" => BinaryOp::DivideAssign,
+};
+TermOp: BinaryOp = {
+    "+" => BinaryOp::Add,
+    "-" => BinaryOp::Subtract,
+};
+FactorOp: BinaryOp = {
+    "*" => BinaryOp::Multiply,
+    "/" => BinaryOp::Divide,
+};
+
+
+// basic building blocks
+
+Value: Box<Expr> = {
+    Ident => Box::new(Expr::Ident(<>)),
+    Number => Box::new(Expr::Number(<>)),
+    String => Box::new(Expr::String(<>)),
+    // groupings:
+    "(" <Expr> ")"
+};
+
+Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
+Number: f64 = r"[0-9]+(.[0-9]+)*" => f64::from_str(<>).unwrap();
+String: String = r#""(?:[^"\\]|\\.)*""# => <>.to_string();

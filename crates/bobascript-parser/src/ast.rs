@@ -1,37 +1,48 @@
-pub type Ast = Vec<Statement>;
+pub type Ast = Vec<Stmt>;
 
-pub enum Statement {
-  Function(),
-  Const(),
-  Let(),
-  Return(Option<Expression>),
-  Expression(Expression),
+#[derive(Debug)]
+pub enum Stmt {
+  Function(String, Box<Expr>),
+  Const(String, Box<Expr>),
+  Let(String, Option<Box<Expr>>),
+  Return(Option<Box<Expr>>),
+  Expression(Box<Expr>),
 }
 
-pub enum Expression {
-  Block(Vec<Statement>),
-  Grouping(Box<Expression>),
-  Call(/* todo: function */),
-  UnaryOperation(UnaryOperator, Box<Expression>),
-  BinaryOperation(Box<Expression>, UnaryOperator, Box<Expression>),
-  If {
-    condition: Box<Expression>,
-    true_branch: Box<Expression>,
-    false_branch: Option<Box<Expression>>,
-  },
+#[derive(Debug)]
+pub enum Expr {
+  Block(Vec<Box<Stmt>>, Option<Box<Expr>>),
+  Call(String, Vec<Box<Expr>>),
+  Unary(UnaryOp, Box<Expr>),
+  Binary(Box<Expr>, BinaryOp, Box<Expr>),
+  If(
+    /* condition: */ Box<Expr>,
+    /* true branch: */ Box<Expr>,
+    /* false branch: */ Option<Box<Expr>>,
+  ),
+  Ident(String),
+  Number(f64),
+  String(String),
 }
 
-pub enum UnaryOperator {
-  Minus,
+#[derive(Debug)]
+pub enum UnaryOp {
+  Negate,
   Not,
 }
 
-pub enum BinaryOperator {
-  Asterisk,
-  Carrot,
-  Minus,
-  Plus,
-  Slash,
+#[derive(Debug)]
+pub enum BinaryOp {
+  Assign,
+  AddAssign,
+  SubtractAssign,
+  MultiplyAssign,
+  DivideAssign,
+  Add,
+  Subtract,
+  Multiply,
+  Divide,
+  Exponent,
   NotEqual,
   Equal,
   GreaterThan,
