@@ -1,50 +1,71 @@
 use std::str::FromStr;
-use crate::ast::{Stmt, Expr, BinaryOp, UnaryOp};
+use crate::ast::{Constant, Stmt, Expr, BinaryOp, UnaryOp};
 
 grammar;
+
+Comma<T>: Vec<T> = {
+  <mut v:(<T> ",")*> <e:T?> => match e {
+    None => v,
+    Some(e) => {
+      v.push(e);
+      v
+    }
+  },
+};
 
 // statements!
 
 pub Stmt: Box<Stmt> = {
-    Function,
-    Declaration,
-    Return,
-    <Expr> ";" => Box::new(Stmt::Expression(<>)),
+  Function,
+  Declaration,
+  Return,
+  // I don't know how to make statements not require semicolons if
+  // the last character is a right brace (})...
+  // screw it! every statement now requires a semicolon
+  <Expr> ";" => Box::new(Stmt::Expression(<>)),
 };
 Function: Box<Stmt> = {
-    "fn" <Ident> "()" <Block> => Box::new(Stmt::Function(<>)),
+  "fn" <Ident> "(" <Comma<Ident>> ")" <Block> ";" => Box::new(Stmt::Function(<>)),
 };
 Declaration: Box<Stmt> = {
-    "const" <Ident> "=" <Expr> ";" => Box::new(Stmt::Const(<>)),
-    "let" <n:Ident> <v:("=" <Expr>)?> ";" => Box::new(Stmt::Let(<>)),
+  "const" <Ident> "=" <Expr> ";" => Box::new(Stmt::Const(<>)),
+  "let" <n:Ident> <v:("=" <Expr>)?> ";" => Box::new(Stmt::Let(<>)),
 };
 Return: Box<Stmt> = {
-    "return" <Expr?> ";" => Box::new(Stmt::Return(<>)),
+  "return" <Expr?> ";" => Box::new(Stmt::Return(<>)),
+};
+Break: Box<Stmt> = {
+  "break" <Expr?> ";" => Box::new(Stmt::Break(<>)),
 };
 
 // expressions!
 
 pub Expr: Box<Expr> = {
-    Block,
-    If,
-    Assignment,
+  "log" <Expr> => Box::new(Expr::Log(<>)),
+  Block,
+  If,
+  While,
+  Assignment,
 };
 Block: Box<Expr> = {
-    "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
+  "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
 };
 If: Box<Expr> = {
-    "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
-    "if" <c:Expr> <t:Block> "else" <f:Block> => Box::new(Expr::If(c, t, Some(f))),
-    "if" <c:Expr> <t:Block> "else" <f:If> => {
-        Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
-    },
+  "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
+  "if" <c:Expr> <t:Block> "else" <f:Block> => Box::new(Expr::If(c, t, Some(f))),
+  "if" <c:Expr> <t:Block> "else" <f:If> => {
+    Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
+  },
+};
+While: Box<Expr> = {
+  "while" <Expr> "{" <Stmt*> "}" => Box::new(Expr::While(<>)),
 };
 
 // precedence stuff
 
 Precedence<Op, Next>: Box<Expr> = {
-    Precedence<Op, Next> Op Next => Box::new(Expr::Binary(<>)),
-    Next,
+  Precedence<Op, Next> Op Next => Box::new(Expr::Binary(<>)),
+  Next,
 };
 
 Assignment = Precedence<AssignOp, Or>;
@@ -56,55 +77,57 @@ Term = Precedence<TermOp, Factor>;
 Factor = Precedence<FactorOp, Exponent>;
 Exponent = Precedence<ExponentOp, Unary>;
 Unary: Box<Expr> = {
-    "-" <Call> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
-    "!" <Call> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
-    Call,
+  "-" <Call> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
+  "!" <Call> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
+  Call,
 };
 Call: Box<Expr> = {
-    <Primary> "()" => Box::new(Expr::Call(<>, vec![])),
-    Primary,
+  <Primary> "(" <Comma<Expr>> ")" => Box::new(Expr::Call(<>)),
+  Primary,
 }
 Primary: Box<Expr> = {
-    Value,
+  Value,
 };
 
 AssignOp: BinaryOp = {
-    "=" => BinaryOp::Assign,
-    "+=" => BinaryOp::AddAssign,
-    "-=" => BinaryOp::SubtractAssign,
-    "*=" => BinaryOp::MultiplyAssign,
-    "/=" => BinaryOp::DivideAssign,
+  "=" => BinaryOp::Assign,
+  "+=" => BinaryOp::AddAssign,
+  "-=" => BinaryOp::SubtractAssign,
+  "*=" => BinaryOp::MultiplyAssign,
+  "/=" => BinaryOp::DivideAssign,
 };
 OrOp: BinaryOp = { "or" => BinaryOp::Or };
 AndOp: BinaryOp = { "and" => BinaryOp::And };
 EqualityOp: BinaryOp = {
-    "==" => BinaryOp::Equal,
-    "!=" => BinaryOp::NotEqual,
+  "==" => BinaryOp::Equal,
+  "!=" => BinaryOp::NotEqual,
 };
 ComparisonOp: BinaryOp = {
-    ">=" => BinaryOp::GreaterEqual,
-    "<=" => BinaryOp::LessEqual,
-    ">" => BinaryOp::GreaterThan,
-    "<" => BinaryOp::LessThan,
+  ">=" => BinaryOp::GreaterEqual,
+  "<=" => BinaryOp::LessEqual,
+  ">" => BinaryOp::GreaterThan,
+  "<" => BinaryOp::LessThan,
 };
 TermOp: BinaryOp = {
-    "+" => BinaryOp::Add,
-    "-" => BinaryOp::Subtract,
+  "+" => BinaryOp::Add,
+  "-" => BinaryOp::Subtract,
 };
 FactorOp: BinaryOp = {
-    "*" => BinaryOp::Multiply,
-    "/" => BinaryOp::Divide,
+  "*" => BinaryOp::Multiply,
+  "/" => BinaryOp::Divide,
 };
 ExponentOp: BinaryOp = { "^" => BinaryOp::Exponent };
 
 // basic building blocks
 
 Value: Box<Expr> = {
-    Ident => Box::new(Expr::Ident(<>)),
-    Number => Box::new(Expr::Number(<>)),
-    String => Box::new(Expr::String(<>)),
-    // groupings:
-    "(" <Expr> ")"
+  "true" => Box::new(Expr::Constant(Constant::True)),
+  "false" => Box::new(Expr::Constant(Constant::False)),
+  Ident => Box::new(Expr::Constant(Constant::Ident(<>))),
+  Number => Box::new(Expr::Constant(Constant::Number(<>))),
+  String => Box::new(Expr::Constant(Constant::String(<>))),
+  // groupings:
+  "(" <Expr> ")"
 };
 
 Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();

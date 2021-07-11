@@ -21,10 +21,17 @@ mod tests {
 
   #[test]
   fn parse_function_stmt() {
-    let stmt = StmtParser::new().parse("fn test() { 3 }").unwrap();
+    let stmt = StmtParser::new().parse("fn test() { 3 };").unwrap();
     assert_eq!(
       &format!("{:?}", stmt),
-      r#"Function("test", Block([], Some(Number(3.0))))"#
+      r#"Function("test", [], Block([], Some(Constant(Number(3.0)))))"#
+    );
+    let stmt = StmtParser::new()
+      .parse("fn test(t1, t2, t3,) { 3 };")
+      .unwrap();
+    assert_eq!(
+      &format!("{:?}", stmt),
+      r#"Function("test", ["t1", "t2", "t3"], Block([], Some(Constant(Number(3.0)))))"#
     );
   }
 
@@ -33,13 +40,13 @@ mod tests {
     let stmt = StmtParser::new().parse("const test = 5.2 * 3;").unwrap();
     assert_eq!(
       &format!("{:?}", stmt),
-      r#"Const("test", Binary(Number(5.2), Multiply, Number(3.0)))"#
+      r#"Const("test", Binary(Constant(Number(5.2)), Multiply, Constant(Number(3.0))))"#
     );
 
     let stmt = StmtParser::new().parse("let test = 5.2 * 3;").unwrap();
     assert_eq!(
       &format!("{:?}", stmt),
-      r#"Let("test", Some(Binary(Number(5.2), Multiply, Number(3.0))))"#
+      r#"Let("test", Some(Binary(Constant(Number(5.2)), Multiply, Constant(Number(3.0)))))"#
     );
 
     let stmt = StmtParser::new().parse("let test;").unwrap();
@@ -51,7 +58,7 @@ mod tests {
     let stmt = StmtParser::new().parse(r#"return "howdy!";"#).unwrap();
     assert_eq!(
       &format!("{:?}", stmt),
-      r#"Return(Some(String("\"howdy!\"")))"#
+      r#"Return(Some(Constant(String("\"howdy!\""))))"#
     );
   }
 
@@ -60,7 +67,7 @@ mod tests {
     let stmt = StmtParser::new().parse("22.5 * (44 + 66);").unwrap();
     assert_eq!(
       &format!("{:?}", stmt),
-      "Expression(Binary(Number(22.5), Multiply, Binary(Number(44.0), Add, Number(66.0))))"
+      "Expression(Binary(Constant(Number(22.5)), Multiply, Binary(Constant(Number(44.0)), Add, Constant(Number(66.0)))))"
     );
   }
 
@@ -69,7 +76,7 @@ mod tests {
     let expr = ExprParser::new().parse("{15 + 1; 3}").unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      "Block([Expression(Binary(Number(15.0), Add, Number(1.0)))], Some(Number(3.0)))"
+      "Block([Expression(Binary(Constant(Number(15.0)), Add, Constant(Number(1.0))))], Some(Constant(Number(3.0))))"
     );
   }
 
@@ -80,22 +87,40 @@ mod tests {
       .unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      r#"If(Binary(Number(3.0), Equal, String("\"3\"")), Block([Expression(Binary(Number(15.0), Add, Number(1.0)))], Some(Number(3.0))), None)"#
+      r#"If(Binary(Constant(Number(3.0)), Equal, Constant(String("\"3\""))), Block([Expression(Binary(Constant(Number(15.0)), Add, Constant(Number(1.0))))], Some(Constant(Number(3.0)))), None)"#
     );
 
     let expr = ExprParser::new().parse("if 3 {3} else if 6 {6}").unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      "If(Number(3.0), Block([], Some(Number(3.0))), Some(Block([], Some(If(Number(6.0), Block([], Some(Number(6.0))), None)))))"
+      "If(Constant(Number(3.0)), Block([], Some(Constant(Number(3.0)))), Some(Block([], Some(If(Constant(Number(6.0)), Block([], Some(Constant(Number(6.0)))), None)))))"
+    );
+  }
+
+  #[test]
+  fn parse_while_expr() {
+    let expr = ExprParser::new().parse("while true {15 + 1;}").unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      "While(Constant(True), [Expression(Binary(Constant(Number(15.0)), Add, Constant(Number(1.0))))])"
     );
   }
 
   #[test]
   fn parse_binary_expr() {
-    let expr = ExprParser::new().parse("22.5 * 44 + 66").unwrap();
+    let expr = ExprParser::new().parse("22.5 * -44 + 66").unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      "Binary(Binary(Number(22.5), Multiply, Number(44.0)), Add, Number(66.0))"
+      "Binary(Binary(Constant(Number(22.5)), Multiply, Unary(Negate, Constant(Number(44.0)))), Add, Constant(Number(66.0)))"
+    );
+  }
+
+  #[test]
+  fn parse_call_expr() {
+    let expr = ExprParser::new().parse("test(3 * 5, 4,)").unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      r#"Call(Constant(Ident("test")), [Binary(Constant(Number(3.0)), Multiply, Constant(Number(5.0))), Constant(Number(4.0))])"#
     );
   }
 }
