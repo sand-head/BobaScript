@@ -116,17 +116,23 @@ impl Compiler {
   fn binary_expr(&mut self, lhs: &Box<Expr>, op: &BinaryOp, rhs: &Box<Expr>) {
     match op {
       BinaryOp::Or => {
+        self.expression(lhs);
         let else_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
         let end_jump = self.emit_opcode_idx(OpCode::Jump(JumpDirection::Forwards, 0));
 
         self.patch_jump(else_jump);
         self.emit_opcode(OpCode::Pop);
 
+        self.expression(rhs);
         self.patch_jump(end_jump);
       }
       BinaryOp::And => {
+        self.expression(lhs);
         let end_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+
         self.emit_opcode(OpCode::Pop);
+        self.expression(rhs);
+
         self.patch_jump(end_jump);
       }
       BinaryOp::Equal => {
@@ -201,6 +207,7 @@ impl Compiler {
   }
 
   fn call_expr(&mut self, function: &Box<Expr>, args: &Vec<Box<Expr>>) {
+    self.expression(function);
     for arg in args {
       self.expression(&arg);
       // todo: check for u8 max

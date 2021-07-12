@@ -11,9 +11,9 @@ fn closures_with_open_upvalues_work() {
       let x = "outside";
       fn inner() {
         x
-      }
+      };
       inner()
-    }
+    };
     "#,
   )
   .unwrap();
@@ -31,9 +31,9 @@ fn closures_with_closed_upvalues_work() {
       let x = "outside";
       fn inner() {
         x
-      }
+      };
       inner
-    }
+    };
 
     let closure = outer();
     "#,

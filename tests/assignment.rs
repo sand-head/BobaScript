@@ -142,8 +142,8 @@ fn to_this() {
     class Foo {
       Foo() {
         this = "value";
-      }
-    }
+      };
+    };
 
     Foo();
     "#,

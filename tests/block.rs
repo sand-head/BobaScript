@@ -24,9 +24,9 @@ fn empty() {
   let mut vm = VM::new();
   let function = compile(
     r#"
-    {}
-    if true {}
-    if false {} else {}
+    {};
+    if true {};
+    if false {} else {};
     "#,
   )
   .unwrap();
@@ -46,7 +46,7 @@ fn scope() {
       let a = "inner";
       log a;
       result = result and a == "inner";
-    }
+    };
 
     log a;
     result = result and a == "outer";
