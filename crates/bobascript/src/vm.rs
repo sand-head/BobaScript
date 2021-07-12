@@ -1,11 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, convert::TryInto, iter::repeat, rc::Rc};
 
-use bobascript_parser::grammar::{StmtParser, StmtsParser};
 use thiserror::Error;
 
 use crate::{
   chunk::{JumpDirection, OpCode},
-  compiler::{compile, compile_expr},
   debug::disassemble_instruction,
   value::{Closure, Function, NativeFunction, Upvalue, Value},
   InterpretResult,
@@ -79,16 +77,7 @@ impl VM {
     self.pop_n(2);
   }
 
-  pub fn interpret<S>(&mut self, source: S) -> InterpretResult<Value>
-  where
-    S: Into<String>,
-  {
-    let parser = StmtsParser::new();
-    let ast = parser
-      .parse(&source.into())
-      .map_err(|_| RuntimeError::Unknown)?;
-    let function = compile(&ast)?;
-
+  pub fn interpret(&mut self, function: Rc<Function>) -> InterpretResult<()> {
     self.push(Value::Function(function.clone()));
     let closure = Closure {
       function,
@@ -101,15 +90,10 @@ impl VM {
     let result = self.run();
     self.stack.clear();
     self.frames.clear();
-    result
+    result.map(|_| ())
   }
 
-  pub fn evaluate<S>(&mut self, expression: S) -> InterpretResult<Value>
-  where
-    S: Into<String>,
-  {
-    let function = compile_expr(expression)?;
-
+  pub fn evaluate(&mut self, function: Rc<Function>) -> InterpretResult<Value> {
     self.push(Value::Function(function.clone()));
     let closure = Closure {
       function,
@@ -248,7 +232,7 @@ impl VM {
 
   fn run(&mut self) -> InterpretResult<Value> {
     loop {
-      let (instruction, line) = {
+      let instruction = {
         let frame = self.frame();
         let instruction = frame.closure.function.chunk.code[frame.ip].clone();
         self.frame_mut().ip += 1;
@@ -264,7 +248,6 @@ impl VM {
         disassemble_instruction(
           &self.frame().closure.function.chunk,
           &instruction,
-          &line,
           self.frame().ip,
         );
       }

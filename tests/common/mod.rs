@@ -1,7 +1,8 @@
 #[macro_export]
 macro_rules! assert_eval {
   ($vm:expr, $eval:expr, $expected:expr) => {
-    let result = $vm.evaluate($eval);
+    let function = bobascript::compiler::compile_expr($eval).unwrap();
+    let result = $vm.evaluate(function);
     println!("eval result: {:?}", result);
     let value = result.unwrap();
     assert!(Value::equal(&value, &$expected));

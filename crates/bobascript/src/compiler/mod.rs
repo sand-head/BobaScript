@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use bobascript_parser::{
   ast::{Ast, Expr},
+  grammar::{ExprParser, StmtsParser},
   SyntaxError,
 };
 use thiserror::Error;
@@ -17,6 +18,8 @@ pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug, Error, Clone)]
 pub enum CompileError {
+  #[error("An unknown error occurred.")]
+  Unknown,
   #[error("Syntax error: {0}")]
   SyntaxError(#[from] SyntaxError),
   #[error("Unexpected character '{1}' on line {0}.")]
@@ -91,13 +94,27 @@ impl CompileContext {
 }
 
 /// Compiles the given source code and returns its resulting function.
-pub fn compile(ast: &Ast) -> CompileResult<Rc<Function>> {
+pub fn compile<S>(source: S) -> CompileResult<Rc<Function>>
+where
+  S: Into<String>,
+{
+  let parser = StmtsParser::new();
+  let ast = parser
+    .parse(&source.into())
+    .map_err(|_| CompileError::Unknown)?;
   let mut compiler = Compiler::new();
-  compiler.compile(ast)
+  compiler.compile(&ast)
 }
 
 /// Compiles a single expression and returns its resulting function.
-pub fn compile_expr(expression: &Box<Expr>) -> CompileResult<Rc<Function>> {
+pub fn compile_expr<S>(source: S) -> CompileResult<Rc<Function>>
+where
+  S: Into<String>,
+{
+  let parser = ExprParser::new();
+  let ast = parser
+    .parse(&source.into())
+    .map_err(|_| CompileError::Unknown)?;
   let mut compiler = Compiler::new();
-  compiler.compile_expr(expression)
+  compiler.compile_expr(&ast)
 }

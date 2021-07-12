@@ -48,7 +48,8 @@ pub enum Upvalue {
 
 #[derive(Debug)]
 pub struct Chunk {
-  pub code: Vec<(OpCode, usize)>,
+  // todo: re-add line numbers to code somehow
+  pub code: Vec<OpCode>,
   pub constants: Vec<Value>,
 }
 impl Default for Chunk {
@@ -61,8 +62,8 @@ impl Default for Chunk {
 }
 
 impl Chunk {
-  pub fn write(&mut self, opcode: OpCode, line: usize) -> usize {
-    self.code.push((opcode, line));
+  pub fn write(&mut self, opcode: OpCode) -> usize {
+    self.code.push(opcode);
     self.code.len() - 1
   }
 

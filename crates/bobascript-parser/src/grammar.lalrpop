@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::{Constant, Stmt, Expr, BinaryOp, UnaryOp};
+use crate::ast::{Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
 
 grammar;
 
@@ -70,7 +70,10 @@ Precedence<Op, Next>: Box<Expr> = {
   Next,
 };
 
-Assignment = Precedence<AssignOp, Or>;
+Assignment: Box<Expr> = {
+  Ident AssignOp Or => Box::new(Expr::Assign(<>)),
+  Or,
+};
 Or = Precedence<OrOp, And>;
 And = Precedence<AndOp, Equality>;
 Equality = Precedence<EqualityOp, Comparison>;
@@ -91,12 +94,12 @@ Primary: Box<Expr> = {
   Value,
 };
 
-AssignOp: BinaryOp = {
-  "=" => BinaryOp::Assign,
-  "+=" => BinaryOp::AddAssign,
-  "-=" => BinaryOp::SubtractAssign,
-  "*=" => BinaryOp::MultiplyAssign,
-  "/=" => BinaryOp::DivideAssign,
+AssignOp: AssignOp = {
+  "=" => AssignOp::Assign,
+  "+=" => AssignOp::AddAssign,
+  "-=" => AssignOp::SubtractAssign,
+  "*=" => AssignOp::MultiplyAssign,
+  "/=" => AssignOp::DivideAssign,
 };
 OrOp: BinaryOp = { "or" => BinaryOp::Or };
 AndOp: BinaryOp = { "and" => BinaryOp::And };

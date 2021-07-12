@@ -27,6 +27,7 @@ pub enum Expr {
   ),
   /// While [Expr] is true, do [Stmt]s.
   While(Box<Expr>, Vec<Box<Stmt>>),
+  Assign(String, AssignOp, Box<Expr>),
   Binary(Box<Expr>, BinaryOp, Box<Expr>),
   Unary(UnaryOp, Box<Expr>),
   Call(Box<Expr>, Vec<Box<Expr>>),
@@ -51,11 +52,6 @@ pub enum UnaryOp {
 
 #[derive(Debug)]
 pub enum BinaryOp {
-  Assign,
-  AddAssign,
-  SubtractAssign,
-  MultiplyAssign,
-  DivideAssign,
   Or,
   And,
   Equal,
@@ -69,4 +65,13 @@ pub enum BinaryOp {
   Multiply,
   Divide,
   Exponent,
+}
+
+#[derive(Debug)]
+pub enum AssignOp {
+  Assign,
+  AddAssign,
+  SubtractAssign,
+  MultiplyAssign,
+  DivideAssign,
 }

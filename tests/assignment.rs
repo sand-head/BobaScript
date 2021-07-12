@@ -1,5 +1,5 @@
 use bobascript::{
-  compiler::CompileError,
+  compiler::{compile, CompileError},
   value::Value,
   vm::{RuntimeError, VM},
 };
@@ -9,7 +9,7 @@ mod common;
 #[test]
 fn associativity() {
   let mut vm = VM::new();
-  let result = vm.interpret(
+  let function = compile(
     r#"
     let a = "a";
     let b = "b";
@@ -17,8 +17,13 @@ fn associativity() {
 
     a = b = c;
     "#,
-  );
+  )
+  .unwrap();
+  let result = vm.interpret(function);
+
+  println!("result: {:?}", result);
   assert!(result.is_ok());
+
   assert_eval!(vm, "a", Value::String("c".to_string()));
   assert_eval!(vm, "b", Value::String("c".to_string()));
   assert_eval!(vm, "c", Value::String("c".to_string()));
@@ -47,6 +52,7 @@ fn grouping() {
     (a) = "value";
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_err());
   assert_compile_err!(result, CompileError::InvalidAssignmentTarget);
 }
@@ -80,9 +86,10 @@ fn local() {
 
       log a = "arg";
       log a;
-    }
+    };
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_ok());
 }
 
@@ -95,6 +102,7 @@ fn prefix_operator() {
     !a = "value";
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_err());
   assert_compile_err!(result, CompileError::InvalidAssignmentTarget);
 }
@@ -108,6 +116,7 @@ fn syntax() {
     let c = a = "var";
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_ok());
   assert_eval!(vm, "a", Value::String("var".to_string()));
   assert_eval!(vm, "c", Value::String("var".to_string()));
@@ -127,6 +136,7 @@ fn to_this() {
     Foo();
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_err());
   assert_compile_err!(result, CompileError::InvalidAssignmentTarget);
 }
@@ -139,6 +149,7 @@ fn undefined() {
     unknown = "what";
     "#,
   );
+  println!("result: {:?}", result);
   assert!(result.is_err());
   assert_runtime_err!(
     result,

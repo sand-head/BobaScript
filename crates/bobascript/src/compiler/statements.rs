@@ -1,30 +1,62 @@
 use bobascript_parser::ast::{Expr, Stmt};
 
-use super::compiler::Compiler;
+use crate::chunk::OpCode;
+
+use super::{compiler::Compiler, FunctionType};
 
 impl Compiler {
   pub fn statement(&mut self, stmt: &Box<Stmt>) {
-    match **stmt {
+    match &**stmt {
       Stmt::Function(ident, args, block) => self.function_stmt(ident, args, block),
-      Stmt::Const(_, _) => todo!(),
-      Stmt::Let(_, _) => todo!(),
-      Stmt::Return(_) => todo!(),
-      Stmt::Break(_) => todo!(),
-      Stmt::Expression(_) => todo!(),
+      Stmt::Const(_, _) => self.const_stmt(),
+      Stmt::Let(ident, expr) => self.let_stmt(ident, expr),
+      Stmt::Return(expr) => self.return_stmt(expr),
+      Stmt::Break(_) => self.break_stmt(),
+      Stmt::Expression(expr) => self.expression_stmt(expr),
     }
   }
 
-  fn function_stmt(&mut self, ident: String, args: Vec<String>, block: Box<Expr>) {}
+  fn function_stmt(&mut self, ident: &String, args: &Vec<String>, block: &Box<Expr>) {
+    let global_idx = self.declare_variable(ident);
+    self.mark_initialized();
+    self.function(FunctionType::Function, ident, args, block);
+    self.define_variable(global_idx);
+  }
 
   fn const_stmt(&mut self) {
     todo!("add const statement");
   }
 
-  fn let_stmt(&mut self) {}
+  fn let_stmt(&mut self, ident: &String, expr: &Option<Box<Expr>>) {
+    let global = self.declare_variable(ident);
 
-  fn return_stmt(&mut self) {}
+    if let Some(expr) = expr {
+      self.expression(&expr);
+    } else {
+      self.emit_opcode(OpCode::Tuple(0));
+    }
 
-  fn break_stmt(&mut self) {}
+    self.define_variable(global);
+  }
 
-  fn expression_stmt(&mut self) {}
+  fn return_stmt(&mut self, expr: &Option<Box<Expr>>) {
+    if let FunctionType::TopLevel = self.current_context().fn_type {
+      // todo: set error
+      // self.parser.set_error(CompileError::TopLevelReturn);
+    }
+
+    if let Some(expr) = expr {
+      self.expression(&expr);
+    }
+    self.emit_opcode(OpCode::Return);
+  }
+
+  fn break_stmt(&mut self) {
+    todo!("add break statement");
+  }
+
+  fn expression_stmt(&mut self, expr: &Box<Expr>) {
+    self.expression(&expr);
+    self.emit_opcode(OpCode::Pop);
+  }
 }
