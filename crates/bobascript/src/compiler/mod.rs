@@ -20,8 +20,8 @@ pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug, Error, Clone)]
 pub enum CompileError {
-  #[error("An unknown error occurred.")]
-  Unknown,
+  #[error("Undefined behavior: {0}")]
+  UndefinedBehavior(String),
   #[error("Syntax error: {0}")]
   SyntaxError(#[from] SyntaxError),
   #[error("Unexpected character '{1}' on line {0}.")]
@@ -107,7 +107,7 @@ where
   let parser = StmtsParser::new();
   let ast = parser
     .parse(&source.into())
-    .map_err(|_| CompileError::Unknown)?;
+    .map_err(|_| CompileError::UndefinedBehavior("An unknown error occured during parsing. This will be handled in a future commit, pinky promise!".to_string()))?;
   let mut compiler = Compiler::new();
   compiler.compile(&ast)
 }
@@ -120,7 +120,7 @@ where
   let parser = ExprParser::new();
   let ast = parser
     .parse(&source.into())
-    .map_err(|_| CompileError::Unknown)?;
+    .map_err(|_| CompileError::UndefinedBehavior("An unknown error occured during parsing. This will be handled in a future commit, pinky promise!".to_string()))?;
   let mut compiler = Compiler::new();
   compiler.compile_expr(&ast)
 }

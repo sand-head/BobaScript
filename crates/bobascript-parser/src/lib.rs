@@ -102,7 +102,7 @@ mod tests {
     let expr = ExprParser::new().parse("if 3 {3} else if 6 {6}").unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      "If(Constant(Number(3.0)), Block([], Some(Constant(Number(3.0)))), Some(Block([], Some(If(Constant(Number(6.0)), Block([], Some(Constant(Number(6.0)))), None)))))"
+      "If(Constant(Number(3.0)), Block([], Some(Constant(Number(3.0)))), Some(If(Constant(Number(6.0)), Block([], Some(Constant(Number(6.0)))), None)))"
     );
   }
 

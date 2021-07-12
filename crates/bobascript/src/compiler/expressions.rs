@@ -55,7 +55,15 @@ impl Compiler {
     self.emit_opcode(OpCode::Pop);
 
     if let Some(false_branch) = false_branch {
-      self.expression(&false_branch);
+      match &**false_branch {
+        Expr::Block(stmts, expr) => self.block_expr(&stmts, &expr),
+        Expr::If(condition, true_branch, false_branch) => {
+          self.if_expr(&condition, &true_branch, &false_branch)
+        }
+        _ => self.set_error(CompileError::UndefinedBehavior(
+          r#"An expression other than "if" or "block" was found in the else clause."#.to_string(),
+        )),
+      }
     }
 
     self.patch_jump(else_jump);

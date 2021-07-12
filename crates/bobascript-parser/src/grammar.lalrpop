@@ -126,13 +126,15 @@ StmtExpr: Box<Expr> = {
 };
 If: Box<Expr> = {
   "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
-  "if" <c:Expr> <t:Block> "else" <f:Block> => Box::new(Expr::If(c, t, Some(f))),
-  "if" <c:Expr> <t:Block> "else" <f:If> => {
-    Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
-  },
+  "if" <c:Expr> <t:Block> "else" <f:BlockOrIf> => Box::new(Expr::If(c, t, Some(f))),
 };
 While: Box<Expr> = {
   "while" <Expr> "{" <Stmt*> "}" => Box::new(Expr::While(<>)),
+};
+
+BlockOrIf = {
+  Block,
+  If
 };
 
 // basic building blocks
