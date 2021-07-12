@@ -47,20 +47,7 @@ Break: Box<Stmt> = {
 // expressions!
 
 pub Expr: Box<Expr> = {
-  "log" <Expr> => Box::new(Expr::Log(<>)),
-  If,
-  While,
   Assignment,
-};
-If: Box<Expr> = {
-  "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
-  "if" <c:Expr> <t:Block> "else" <f:Block> => Box::new(Expr::If(c, t, Some(f))),
-  "if" <c:Expr> <t:Block> "else" <f:If> => {
-    Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
-  },
-};
-While: Box<Expr> = {
-  "while" <Expr> "{" <Stmt*> "}" => Box::new(Expr::While(<>)),
 };
 
 // precedence stuff
@@ -71,7 +58,8 @@ Precedence<Op, Next>: Box<Expr> = {
 };
 
 Assignment: Box<Expr> = {
-  Ident AssignOp Or => Box::new(Expr::Assign(<>)),
+  // right-to-left assoc:
+  Or AssignOp Assignment => Box::new(Expr::Assign(<>)),
   Or,
 };
 Or = Precedence<OrOp, And>;
@@ -101,8 +89,14 @@ AssignOp: AssignOp = {
   "*=" => AssignOp::MultiplyAssign,
   "/=" => AssignOp::DivideAssign,
 };
-OrOp: BinaryOp = { "or" => BinaryOp::Or };
-AndOp: BinaryOp = { "and" => BinaryOp::And };
+OrOp: BinaryOp = {
+  "or" => BinaryOp::Or,
+  "||" => BinaryOp::Or,
+};
+AndOp: BinaryOp = {
+  "and" => BinaryOp::And,
+  "&&" => BinaryOp::And,
+};
 EqualityOp: BinaryOp = {
   "==" => BinaryOp::Equal,
   "!=" => BinaryOp::NotEqual,
@@ -123,6 +117,25 @@ FactorOp: BinaryOp = {
 };
 ExponentOp: BinaryOp = { "^" => BinaryOp::Exponent };
 
+// statement-expressions are statement-like in nature
+// and are commonly found as statements in other languages
+
+StmtExpr: Box<Expr> = {
+  "log" "(" <Expr> ")" => Box::new(Expr::Log(<>)),
+  If,
+  While,
+};
+If: Box<Expr> = {
+  "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
+  "if" <c:Expr> <t:Block> "else" <f:Block> => Box::new(Expr::If(c, t, Some(f))),
+  "if" <c:Expr> <t:Block> "else" <f:If> => {
+    Box::new(Expr::If(c, t, Some(Box::new(Expr::Block(vec![], Some(f))))))
+  },
+};
+While: Box<Expr> = {
+  "while" <Expr> "{" <Stmt*> "}" => Box::new(Expr::While(<>)),
+};
+
 // basic building blocks
 
 Atom: Box<Expr> = {
@@ -135,6 +148,7 @@ Atom: Box<Expr> = {
   Block,
   // groupings:
   "(" <Expr> ")",
+  StmtExpr
 };
 
 Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();

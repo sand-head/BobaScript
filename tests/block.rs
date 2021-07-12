@@ -44,11 +44,11 @@ fn scope() {
 
     {
       let a = "inner";
-      log a;
+      log(a);
       result = result and a == "inner";
     };
 
-    log a;
+    log(a);
     result = result and a == "outer";
     "#,
   )

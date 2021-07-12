@@ -2,7 +2,7 @@ use bobascript_parser::ast::{Expr, Stmt};
 
 use crate::chunk::OpCode;
 
-use super::{compiler::Compiler, FunctionType};
+use super::{compiler::Compiler, CompileError, FunctionType};
 
 impl Compiler {
   pub fn statement(&mut self, stmt: &Box<Stmt>) {
@@ -42,8 +42,7 @@ impl Compiler {
 
   fn return_stmt(&mut self, expr: &Option<Box<Expr>>) {
     if let FunctionType::TopLevel = self.context().fn_type {
-      // todo: set error
-      // self.parser.set_error(CompileError::TopLevelReturn);
+      self.set_error(CompileError::TopLevelReturn);
     }
 
     if let Some(expr) = expr {

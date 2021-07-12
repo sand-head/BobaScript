@@ -4,7 +4,7 @@ use bobascript_parser::ast::{Ast, Expr, Stmt};
 
 use super::{CompileContext, CompileError, CompileResult, FunctionType, Local};
 use crate::{
-  chunk::{Chunk, JumpDirection, OpCode, Upvalue},
+  chunk::{JumpDirection, OpCode, Upvalue},
   debug::disassemble_chunk,
   value::{Function, Value},
 };
@@ -30,7 +30,9 @@ impl Compiler {
     let function = self.end_compiler();
 
     if self.errors.len() > 0 {
-      Err(self.errors.first().unwrap().clone())
+      let first = self.errors.pop().unwrap();
+      self.errors.clear();
+      Err(first)
     } else {
       Ok(function)
     }
@@ -42,10 +44,16 @@ impl Compiler {
 
     let function = self.end_compiler();
     if self.errors.len() > 0 {
-      Err(self.errors.first().unwrap().clone())
+      let first = self.errors.pop().unwrap();
+      self.errors.clear();
+      Err(first)
     } else {
       Ok(function)
     }
+  }
+
+  pub(super) fn set_error(&mut self, error: CompileError) {
+    self.errors.push(error);
   }
 
   pub(super) fn with_context<F>(&mut self, fn_type: FunctionType, f: F) -> CompileContext
@@ -211,9 +219,7 @@ impl Compiler {
         .is_some();
 
       if name_exists {
-        // self
-        //   .parser
-        //   .set_error(CompileError::VariableAlreadyExists(name.clone()));
+        self.set_error(CompileError::VariableAlreadyExists(name.clone()));
       } else {
         self.context_mut().locals.push(Local {
           name: name.to_string(),
@@ -269,7 +275,7 @@ impl Compiler {
     match context.resolve_local(name) {
       Ok(local) => local,
       Err(err) => {
-        // self.parser.set_error(err);
+        self.set_error(err);
         None
       }
     }

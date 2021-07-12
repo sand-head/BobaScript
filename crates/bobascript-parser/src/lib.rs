@@ -47,6 +47,14 @@ mod tests {
       r#"Let("test", Some(Binary(Constant(Number(5.2)), Multiply, Constant(Number(3.0)))))"#
     );
 
+    let stmt = StmtParser::new()
+      .parse("let test = 22.5 * if true {3} else {4};")
+      .unwrap();
+    assert_eq!(
+      &format!("{:?}", stmt),
+      r#"Let("test", Some(Binary(Constant(Number(22.5)), Multiply, If(Constant(True), Block([], Some(Constant(Number(3.0)))), Some(Block([], Some(Constant(Number(4.0)))))))))"#
+    );
+
     let stmt = StmtParser::new().parse("let test;").unwrap();
     assert_eq!(&format!("{:?}", stmt), r#"Let("test", None)"#);
   }
@@ -101,6 +109,29 @@ mod tests {
     assert_eq!(
       &format!("{:?}", expr),
       "While(Constant(True), [Expression(Binary(Constant(Number(15.0)), Add, Constant(Number(1.0))))])"
+    );
+  }
+
+  #[test]
+  fn parse_log_expr() {
+    let expr = ExprParser::new().parse(r#"log(a = "arg")"#).unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      r#"Log(Assign(Constant(Ident("a")), Assign, Constant(String("\"arg\""))))"#
+    );
+  }
+
+  #[test]
+  fn parse_assign_expr() {
+    let expr = ExprParser::new().parse("a = 5").unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      r#"Assign(Constant(Ident("a")), Assign, Constant(Number(5.0)))"#
+    );
+    let expr = ExprParser::new().parse("a *= b = 5").unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      r#"Assign(Constant(Ident("a")), MultiplyAssign, Assign(Constant(Ident("b")), Assign, Constant(Number(5.0))))"#
     );
   }
 

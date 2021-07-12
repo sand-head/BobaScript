@@ -7,7 +7,7 @@ use crate::{
   value::Value,
 };
 
-use super::compiler::Compiler;
+use super::{compiler::Compiler, CompileError};
 
 impl Compiler {
   pub fn expression(&mut self, expr: &Box<Expr>) {
@@ -79,37 +79,41 @@ impl Compiler {
     self.emit_opcode(OpCode::Tuple(0));
   }
 
-  fn assign_expr(&mut self, name: &String, op: &AssignOp, expr: &Box<Expr>) {
-    let (get_op, set_op) = self.resolve_variable(name);
-    match op {
-      AssignOp::Assign => {
-        self.expression(&expr);
-        self.emit_opcode(set_op);
+  fn assign_expr(&mut self, name: &Box<Expr>, op: &AssignOp, expr: &Box<Expr>) {
+    if let Expr::Constant(Constant::Ident(name)) = &**name {
+      let (get_op, set_op) = self.resolve_variable(name);
+      match op {
+        AssignOp::Assign => {
+          self.expression(&expr);
+          self.emit_opcode(set_op);
+        }
+        AssignOp::AddAssign => {
+          self.emit_opcode(get_op);
+          self.expression(&expr);
+          self.emit_opcode(OpCode::Add);
+          self.emit_opcode(set_op);
+        }
+        AssignOp::SubtractAssign => {
+          self.emit_opcode(get_op);
+          self.expression(&expr);
+          self.emit_opcode(OpCode::Subtract);
+          self.emit_opcode(set_op);
+        }
+        AssignOp::MultiplyAssign => {
+          self.emit_opcode(get_op);
+          self.expression(&expr);
+          self.emit_opcode(OpCode::Multiply);
+          self.emit_opcode(set_op);
+        }
+        AssignOp::DivideAssign => {
+          self.emit_opcode(get_op);
+          self.expression(&expr);
+          self.emit_opcode(OpCode::Divide);
+          self.emit_opcode(set_op);
+        }
       }
-      AssignOp::AddAssign => {
-        self.emit_opcode(get_op);
-        self.expression(&expr);
-        self.emit_opcode(OpCode::Add);
-        self.emit_opcode(set_op);
-      }
-      AssignOp::SubtractAssign => {
-        self.emit_opcode(get_op);
-        self.expression(&expr);
-        self.emit_opcode(OpCode::Subtract);
-        self.emit_opcode(set_op);
-      }
-      AssignOp::MultiplyAssign => {
-        self.emit_opcode(get_op);
-        self.expression(&expr);
-        self.emit_opcode(OpCode::Multiply);
-        self.emit_opcode(set_op);
-      }
-      AssignOp::DivideAssign => {
-        self.emit_opcode(get_op);
-        self.expression(&expr);
-        self.emit_opcode(OpCode::Divide);
-        self.emit_opcode(set_op);
-      }
+    } else {
+      self.set_error(CompileError::InvalidAssignmentTarget);
     }
   }
 
@@ -210,10 +214,9 @@ impl Compiler {
     self.expression(function);
     for arg in args {
       self.expression(&arg);
-      // todo: check for u8 max
-      // if arg_count == u8::MAX {
-      //   self.parser.set_error(CompileError::TooManyArguments);
-      // }
+      if args.len() >= u8::MAX.into() {
+        self.set_error(CompileError::TooManyArguments);
+      }
     }
     self.emit_opcode(OpCode::Call(args.len().try_into().unwrap()));
   }

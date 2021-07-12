@@ -25,12 +25,10 @@ macro_rules! assert_runtime_err {
 #[macro_export]
 macro_rules! assert_compile_err {
   ($result:expr, $expected:expr) => {
-    assert!(
-      if let Err(bobascript::InterpretError::CompileError(result)) = $result {
-        std::mem::discriminant(&result) == std::mem::discriminant(&$expected)
-      } else {
-        false
-      }
-    );
+    assert!(if let Err(result) = $result {
+      std::mem::discriminant(&result) == std::mem::discriminant(&$expected)
+    } else {
+      false
+    });
   };
 }

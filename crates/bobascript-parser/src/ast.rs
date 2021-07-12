@@ -28,7 +28,7 @@ pub enum Expr {
   ),
   /// While [Expr] is true, do [Stmt]s.
   While(Box<Expr>, Vec<Box<Stmt>>),
-  Assign(String, AssignOp, Box<Expr>),
+  Assign(Box<Expr>, AssignOp, Box<Expr>),
   Binary(Box<Expr>, BinaryOp, Box<Expr>),
   Unary(UnaryOp, Box<Expr>),
   Call(Box<Expr>, Vec<Box<Expr>>),
