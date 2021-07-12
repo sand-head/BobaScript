@@ -87,6 +87,9 @@ AssignOp: AssignOp = {
   "-=" => AssignOp::SubtractAssign,
   "*=" => AssignOp::MultiplyAssign,
   "/=" => AssignOp::DivideAssign,
+  "^=" => AssignOp::ExponentAssign,
+  "||=" => AssignOp::OrAssign,
+  "&&=" => AssignOp::AndAssign,
 };
 OrOp: BinaryOp = {
   "or" => BinaryOp::Or,

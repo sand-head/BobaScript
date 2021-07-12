@@ -120,6 +120,32 @@ impl Compiler {
           self.emit_opcode(OpCode::Divide);
           self.emit_opcode(set_op);
         }
+        AssignOp::ExponentAssign => {
+          self.emit_opcode(get_op);
+          self.expression(&expr);
+          self.emit_opcode(OpCode::Exponent);
+          self.emit_opcode(set_op);
+        }
+        AssignOp::OrAssign => {
+          self.emit_opcode(get_op);
+          let else_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+          let end_jump = self.emit_opcode_idx(OpCode::Jump(JumpDirection::Forwards, 0));
+
+          self.patch_jump(else_jump);
+          self.emit_opcode(OpCode::Pop);
+
+          self.expression(&expr);
+          self.patch_jump(end_jump);
+        }
+        AssignOp::AndAssign => {
+          self.emit_opcode(get_op);
+          let end_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
+
+          self.emit_opcode(OpCode::Pop);
+          self.expression(&expr);
+
+          self.patch_jump(end_jump);
+        }
       }
     } else {
       self.set_error(CompileError::InvalidAssignmentTarget);

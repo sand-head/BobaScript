@@ -79,4 +79,7 @@ pub enum AssignOp {
   SubtractAssign,
   MultiplyAssign,
   DivideAssign,
+  ExponentAssign,
+  OrAssign,
+  AndAssign,
 }
