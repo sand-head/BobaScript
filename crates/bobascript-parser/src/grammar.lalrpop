@@ -18,6 +18,7 @@ pub Stmts = {
   Stmt*
 };
 pub Stmt: Box<Stmt> = {
+  Class,
   Function,
   Declaration,
   Return,
@@ -25,6 +26,9 @@ pub Stmt: Box<Stmt> = {
   // the last character is a right brace (})...
   // screw it! every statement now requires a semicolon
   <Expr> ";" => Box::new(Stmt::Expression(<>)),
+};
+Class: Box<Stmt> = {
+  "class" <Ident> "{" "}" ";" => Box::new(Stmt::Class(<>))
 };
 Function: Box<Stmt> = {
   "fn" <Ident> "(" <Comma<Ident>> ")" <Block> ";" => Box::new(Stmt::Function(<>)),
@@ -44,13 +48,9 @@ Break: Box<Stmt> = {
 
 pub Expr: Box<Expr> = {
   "log" <Expr> => Box::new(Expr::Log(<>)),
-  Block,
   If,
   While,
   Assignment,
-};
-Block: Box<Expr> = {
-  "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
 };
 If: Box<Expr> = {
   "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
@@ -91,7 +91,7 @@ Call: Box<Expr> = {
   Primary,
 }
 Primary: Box<Expr> = {
-  Value,
+  Atom,
 };
 
 AssignOp: AssignOp = {
@@ -125,13 +125,14 @@ ExponentOp: BinaryOp = { "^" => BinaryOp::Exponent };
 
 // basic building blocks
 
-Value: Box<Expr> = {
+Atom: Box<Expr> = {
   "true" => Box::new(Expr::Constant(Constant::True)),
   "false" => Box::new(Expr::Constant(Constant::False)),
   Ident => Box::new(Expr::Constant(Constant::Ident(<>))),
   Number => Box::new(Expr::Constant(Constant::Number(<>))),
   String => Box::new(Expr::Constant(Constant::String(<>))),
   Tuple => Box::new(Expr::Constant(Constant::Tuple(<>))),
+  Block,
   // groupings:
   "(" <Expr> ")",
 };
@@ -148,4 +149,7 @@ Tuple: Vec<Box<Expr>> = {
       v
     }
   },
+};
+Block: Box<Expr> = {
+  "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
 };
