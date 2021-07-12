@@ -40,7 +40,7 @@ impl Compiler {
   }
 
   fn return_stmt(&mut self, expr: &Option<Box<Expr>>) {
-    if let FunctionType::TopLevel = self.current_context().fn_type {
+    if let FunctionType::TopLevel = self.context().fn_type {
       // todo: set error
       // self.parser.set_error(CompileError::TopLevelReturn);
     }

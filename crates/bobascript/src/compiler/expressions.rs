@@ -61,7 +61,7 @@ impl Compiler {
   }
 
   fn while_expr(&mut self, condition: &Box<Expr>, stmts: &Vec<Box<Stmt>>) {
-    let loop_start = self.current_chunk().code.len();
+    let loop_start = self.context_mut().chunk_mut().code.len();
 
     self.expression(&condition);
     let exit_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));

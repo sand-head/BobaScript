@@ -1,14 +1,16 @@
 use std::rc::Rc;
 
 use bobascript_parser::{
-  ast::{Ast, Expr},
   grammar::{ExprParser, StmtsParser},
   SyntaxError,
 };
 use thiserror::Error;
 
 use self::compiler::Compiler;
-use crate::{chunk::Upvalue, value::Function};
+use crate::{
+  chunk::{Chunk, Upvalue},
+  value::Function,
+};
 
 mod compiler;
 mod expressions;
@@ -74,6 +76,10 @@ impl CompileContext {
       upvalues: Vec::new(),
       scope_depth: 0,
     }
+  }
+
+  fn chunk_mut(&mut self) -> &mut Chunk {
+    &mut self.function.chunk
   }
 
   fn resolve_local(&self, name: &String) -> CompileResult<Option<usize>> {

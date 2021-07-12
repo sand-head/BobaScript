@@ -57,32 +57,12 @@ impl Compiler {
     self.contexts.pop().unwrap()
   }
 
-  pub(super) fn current_context(&self) -> &CompileContext {
+  pub(super) fn context(&self) -> &CompileContext {
     &self.contexts.last().unwrap()
   }
 
-  pub(super) fn current_context_mut(&mut self) -> &mut CompileContext {
+  pub(super) fn context_mut(&mut self) -> &mut CompileContext {
     self.contexts.last_mut().unwrap()
-  }
-
-  pub(super) fn current_chunk(&mut self) -> &mut Chunk {
-    &mut self.contexts.last_mut().unwrap().function.chunk
-  }
-
-  pub(super) fn scope_depth(&self) -> i32 {
-    self.contexts.last().unwrap().scope_depth
-  }
-
-  pub(super) fn scope_depth_mut(&mut self) -> &mut i32 {
-    &mut self.contexts.last_mut().unwrap().scope_depth
-  }
-
-  pub(super) fn locals(&self) -> &Vec<Local> {
-    &self.contexts.last().unwrap().locals
-  }
-
-  pub(super) fn locals_mut(&mut self) -> &mut Vec<Local> {
-    &mut self.contexts.last_mut().unwrap().locals
   }
 
   pub(super) fn block(&mut self, stmts: &Vec<Box<Stmt>>, expr: &Option<Box<Expr>>) {
@@ -106,15 +86,15 @@ impl Compiler {
   ) {
     let context = self.with_context(fn_type, |c| {
       if fn_type != FunctionType::TopLevel {
-        c.current_context_mut().function.name = ident.clone();
+        c.context_mut().function.name = ident.clone();
       }
       c.begin_scope();
 
       for arg in args {
-        if c.current_context().function.arity == u8::MAX {
+        if c.context().function.arity == u8::MAX {
           // todo: throw too many parameters error
         } else {
-          c.current_context_mut().function.arity += 1;
+          c.context_mut().function.arity += 1;
         }
 
         // parse the parameter
@@ -146,32 +126,32 @@ impl Compiler {
   }
 
   pub(super) fn make_constant(&mut self, value: Value) -> usize {
-    self.current_chunk().add_constant(value)
+    self.context_mut().chunk_mut().add_constant(value)
   }
 
   pub(super) fn emit_opcode(&mut self, opcode: OpCode) {
     // let line_no = self.parser.previous().unwrap().line;
-    // self.current_chunk().write(opcode, line_no);
-    self.current_chunk().write(opcode);
+    // self.current_context_mut().current_chunk_mut().write(opcode, line_no);
+    self.context_mut().chunk_mut().write(opcode);
   }
 
   /// Emits the given `OpCode` and returns its index in the chunk.
   pub(super) fn emit_opcode_idx(&mut self, opcode: OpCode) -> usize {
     // let line_no = self.parser.previous().unwrap().line;
-    // self.current_chunk().write(opcode, line_no)
-    self.current_chunk().write(opcode)
+    // self.current_context_mut().current_chunk_mut().write(opcode, line_no)
+    self.context_mut().chunk_mut().write(opcode)
   }
 
   /// This just emits a `Jump` instruction, but backwards
   pub(super) fn emit_loop(&mut self, start: usize) {
-    let offset = self.current_chunk().code.len() - start + 1;
+    let offset = self.context_mut().chunk_mut().code.len() - start + 1;
     self.emit_opcode(OpCode::Jump(JumpDirection::Backwards, offset));
   }
 
   pub(super) fn patch_jump(&mut self, offset: usize) {
-    let new_jump = self.current_chunk().code.len() - 1 - offset;
-    let opcode = &self.current_chunk().code[offset];
-    self.current_chunk().code[offset] = match opcode {
+    let new_jump = self.context_mut().chunk_mut().code.len() - 1 - offset;
+    let opcode = &self.context_mut().chunk_mut().code[offset];
+    self.context_mut().chunk_mut().code[offset] = match opcode {
       OpCode::Jump(direction, _) => OpCode::Jump(*direction, new_jump),
       OpCode::JumpIfFalse(_) => OpCode::JumpIfFalse(new_jump),
       _ => unreachable!(),
@@ -188,21 +168,21 @@ impl Compiler {
   }
 
   fn begin_scope(&mut self) {
-    *self.scope_depth_mut() += 1;
+    self.context_mut().scope_depth += 1;
   }
 
   fn end_scope(&mut self) {
-    *self.scope_depth_mut() -= 1;
+    self.context_mut().scope_depth -= 1;
 
     // let mut count: usize = 0;
-    for i in (0..self.locals().len()).rev() {
-      if self.locals()[i].depth > self.scope_depth() {
-        if self.locals()[i].is_captured {
+    for i in (0..self.context().locals.len()).rev() {
+      if self.context().locals[i].depth > self.context().scope_depth {
+        if self.context().locals[i].is_captured {
           self.emit_opcode(OpCode::CloseUpvalue);
         } else {
           self.emit_opcode(OpCode::Pop);
         }
-        self.locals_mut().remove(i);
+        self.context_mut().locals.remove(i);
         // count += 1;
       } else {
         break;
@@ -220,12 +200,13 @@ impl Compiler {
 
   /// Adds a variable to the scope
   pub(super) fn declare_variable(&mut self, name: &String) -> usize {
-    if self.scope_depth() > 0 {
+    if self.context().scope_depth > 0 {
       let name_exists = self
-        .locals()
+        .context()
+        .locals
         .iter()
         .rev()
-        .filter(|local| local.depth != -1 && local.depth < self.scope_depth())
+        .filter(|local| local.depth != -1 && local.depth < self.context().scope_depth)
         .find(|local| name == &local.name)
         .is_some();
 
@@ -234,7 +215,7 @@ impl Compiler {
         //   .parser
         //   .set_error(CompileError::VariableAlreadyExists(name.clone()));
       } else {
-        self.locals_mut().push(Local {
+        self.context_mut().locals.push(Local {
           name: name.to_string(),
           depth: -1,
           is_captured: false,
@@ -247,15 +228,15 @@ impl Compiler {
   }
 
   pub(super) fn mark_initialized(&mut self) {
-    if self.scope_depth() != 0 {
-      let idx = self.locals().len() - 1;
-      self.locals_mut()[idx].depth = self.scope_depth();
+    if self.context().scope_depth != 0 {
+      let idx = self.context().locals.len() - 1;
+      self.context_mut().locals[idx].depth = self.context().scope_depth;
     }
   }
 
   /// Initializes a variable in the scope for use
   pub(super) fn define_variable(&mut self, global: usize) {
-    if self.scope_depth() > 0 {
+    if self.context().scope_depth > 0 {
       self.mark_initialized();
     } else {
       self.emit_opcode(OpCode::DefineGlobal(global));
