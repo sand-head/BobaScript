@@ -171,7 +171,7 @@ mod tests {
       .unwrap();
     assert_eq!(
       &format!("{:?}", expr),
-      r#"Call(Call(Constant(Tuple([1, 3, 5]))))"#
+      r#"Index(Index(Constant(Tuple([Constant(Number(1.0)), Constant(Number(3.0)), Constant(Number(5.0)), Constant(Tuple([Constant(String("\"test\"")), Constant(String("\"I hope this works!!\""))]))])), Constant(Number(3.0))), Constant(Number(1.0)))"#
     );
   }
 }

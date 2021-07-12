@@ -69,20 +69,17 @@ Equality = Precedence<EqualityOp, Comparison>;
 Comparison = Precedence<ComparisonOp, Term>;
 Term = Precedence<TermOp, Factor>;
 Factor = Precedence<FactorOp, Exponent>;
-Exponent = Precedence<ExponentOp, Unary>;
-Unary: Box<Expr> = {
-  "-" <Call> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
-  "!" <Call> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
-  Call,
+Exponent = Precedence<ExponentOp, Prefix>;
+Prefix: Box<Expr> = {
+  "-" <Suffix> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
+  "!" <Suffix> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
+  Suffix,
 };
-Call: Box<Expr> = {
-  <Primary> "[" <Expr> "]" => Box::new(Expr::Index(<>)),
-  <Primary> "(" <Comma<Expr>> ")" => Box::new(Expr::Call(<>)),
-  Primary,
-}
-Primary: Box<Expr> = {
+Suffix: Box<Expr> = {
   Atom,
-};
+  <Suffix> "[" <Expr> "]" => Box::new(Expr::Index(<>)),
+  <Suffix> "(" <Comma<Expr>> ")" => Box::new(Expr::Call(<>)),
+}
 
 AssignOp: AssignOp = {
   "=" => AssignOp::Assign,
