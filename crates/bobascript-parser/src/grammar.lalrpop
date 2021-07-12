@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::collections::HashMap;
 use crate::ast::{Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
 
 grammar;
@@ -146,6 +147,7 @@ Atom: Box<Expr> = {
   Number => Box::new(Expr::Constant(Constant::Number(<>))),
   String => Box::new(Expr::Constant(Constant::String(<>))),
   Tuple => Box::new(Expr::Constant(Constant::Tuple(<>))),
+  Record => Box::new(Expr::Constant(Constant::Record(<>))),
   Block,
   // groupings:
   "(" <Expr> ")",
@@ -156,8 +158,8 @@ Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 Number: f64 = r"[0-9]+(.[0-9]+)*" => f64::from_str(<>).unwrap();
 String: String = r#""(?:[^"\\]|\\.)*""# => <>.to_string();
 Tuple: Vec<Box<Expr>> = {
-  "(" ")" => vec![],
-  "(" <mut v:(<Expr> ",")+> <e:Expr?> ")" => match e {
+  "#" "[" "]" => vec![],
+  "#" "[" <mut v:(<Expr> ",")+> <e:Expr?> "]" => match e {
     None => v,
     Some(e) => {
       v.push(e);
@@ -165,6 +167,11 @@ Tuple: Vec<Box<Expr>> = {
     }
   },
 };
+Record: HashMap<String, Box<Expr>> = "#" "{" <Comma<Field>> "}" => <>.into_iter().collect();
 Block: Box<Expr> = {
   "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
+};
+
+Field: (String, Box<Expr>) = {
+  <String> ":" <Expr> => (<>),
 };

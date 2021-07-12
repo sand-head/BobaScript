@@ -15,7 +15,10 @@ pub type Result<T> = std::result::Result<T, SyntaxError>;
 
 mod tests {
   #![allow(unused_imports)]
-  use crate::grammar::{ExprParser, StmtParser};
+  use crate::{
+    ast::Expr,
+    grammar::{ExprParser, StmtParser},
+  };
 
   #[test]
   fn parse_function_stmt() {
@@ -150,6 +153,25 @@ mod tests {
     assert_eq!(
       &format!("{:?}", expr),
       r#"Call(Constant(Ident("test")), [Binary(Constant(Number(3.0)), Multiply, Constant(Number(5.0))), Constant(Number(4.0))])"#
+    );
+  }
+
+  #[test]
+  fn parse_complex_tuples() {
+    let expr = ExprParser::new()
+      .parse(r#"#[1, 3, 5, #["test", "I hope this works!!"]]"#)
+      .unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      r#"Constant(Tuple([Constant(Number(1.0)), Constant(Number(3.0)), Constant(Number(5.0)), Constant(Tuple([Constant(String("\"test\"")), Constant(String("\"I hope this works!!\""))]))]))"#
+    );
+
+    let expr = ExprParser::new()
+      .parse(r#"#[1, 3, 5, #["test", "I hope this works!!"]][3][1]"#)
+      .unwrap();
+    assert_eq!(
+      &format!("{:?}", expr),
+      r#"Call(Call(Constant(Tuple([1, 3, 5]))))"#
     );
   }
 }

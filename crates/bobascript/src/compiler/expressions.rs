@@ -252,6 +252,9 @@ impl Compiler {
         }
         self.emit_opcode(OpCode::Tuple(tuple.len().try_into().unwrap()));
       }
+      Constant::Record(record) => {
+        todo!("records not implemented")
+      }
     }
   }
 }

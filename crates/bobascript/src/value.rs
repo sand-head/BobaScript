@@ -116,7 +116,7 @@ impl TryInto<String> for Value {
   fn try_into(self) -> Result<String, Self::Error> {
     match self {
       Self::Tuple(tuple) => Ok(format!(
-        "({})",
+        "#[{}]",
         tuple
           .iter()
           .map(|v| format!("{}", v))

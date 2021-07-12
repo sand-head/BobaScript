@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub type Ast = Vec<Box<Stmt>>;
 
 #[derive(Debug)]
@@ -44,6 +46,7 @@ pub enum Constant {
   Number(f64),
   String(String),
   Tuple(Vec<Box<Expr>>),
+  Record(HashMap<String, Box<Expr>>),
 }
 
 #[derive(Debug)]
