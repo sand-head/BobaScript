@@ -75,6 +75,7 @@ Unary: Box<Expr> = {
   Call,
 };
 Call: Box<Expr> = {
+  <Primary> "[" <Expr> "]" => Box::new(Expr::Index(<>)),
   <Primary> "(" <Comma<Expr>> ")" => Box::new(Expr::Call(<>)),
   Primary,
 }

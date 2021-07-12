@@ -21,6 +21,7 @@ impl Compiler {
       Expr::Assign(name, op, expr) => self.assign_expr(name, op, expr),
       Expr::Binary(lhs, op, rhs) => self.binary_expr(lhs, op, rhs),
       Expr::Unary(op, expr) => self.unary_expr(op, expr),
+      Expr::Index(object, index) => self.index_expr(object, index),
       Expr::Call(function, args) => self.call_expr(function, args),
       Expr::Constant(constant) => self.constant_expr(constant),
     }
@@ -208,6 +209,12 @@ impl Compiler {
       UnaryOp::Negate => self.emit_opcode(OpCode::Negate),
       UnaryOp::Not => self.emit_opcode(OpCode::Not),
     }
+  }
+
+  fn index_expr(&mut self, object: &Box<Expr>, index: &Box<Expr>) {
+    self.expression(object);
+    self.expression(index);
+    self.emit_opcode(OpCode::Index);
   }
 
   fn call_expr(&mut self, function: &Box<Expr>, args: &Vec<Box<Expr>>) {

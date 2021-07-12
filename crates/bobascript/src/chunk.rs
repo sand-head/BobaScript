@@ -28,6 +28,7 @@ pub enum OpCode {
   Log,
   Jump(JumpDirection, usize),
   JumpIfFalse(usize),
+  Index,
   Call(u8),
   Closure(usize, Vec<Upvalue>),
   CloseUpvalue,

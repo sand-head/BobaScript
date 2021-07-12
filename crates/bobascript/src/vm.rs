@@ -37,6 +37,8 @@ pub enum RuntimeError {
   IncorrectParameterCount(u8, u8),
   #[error("Stack overflow.")]
   StackOverflow,
+  #[error(r#"Could not index value "{0}" by value "{1}"."#)]
+  InvalidIndex(String, String),
 }
 
 struct CallFrame {
@@ -413,6 +415,29 @@ impl VM {
           if !condition {
             self.frame_mut().ip += offset;
           }
+        }
+        OpCode::Index => {
+          let index = self.pop().unwrap();
+          let object = self.pop().unwrap();
+
+          match (&object, &index) {
+            (Value::Tuple(tuple), Value::Number(num)) => {
+              let num = num.round() as usize;
+              if num > 0 && num < tuple.len() {
+                self.push(tuple[num].clone());
+                Ok(())
+              } else {
+                Err(RuntimeError::InvalidIndex(
+                  object.to_string(),
+                  index.to_string(),
+                ))
+              }
+            }
+            (_, _) => Err(RuntimeError::InvalidIndex(
+              object.to_string(),
+              index.to_string(),
+            )),
+          }?;
         }
         OpCode::Call(args) => {
           self.call_value(self.peek(args as usize).unwrap().clone(), args)?;
