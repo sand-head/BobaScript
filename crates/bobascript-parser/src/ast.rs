@@ -33,6 +33,7 @@ pub enum Expr {
   Assign(Box<Expr>, AssignOp, Box<Expr>),
   Binary(Box<Expr>, BinaryOp, Box<Expr>),
   Unary(UnaryOp, Box<Expr>),
+  Property(Box<Expr>, String),
   Index(Box<Expr>, Box<Expr>),
   Call(Box<Expr>, Vec<Box<Expr>>),
   Constant(Constant),

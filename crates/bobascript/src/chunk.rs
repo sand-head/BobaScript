@@ -3,6 +3,7 @@ use crate::value::Value;
 #[derive(Debug, Clone)]
 pub enum OpCode {
   Tuple(u8),
+  Record(u8),
   Constant(usize),
   True,
   False,
@@ -15,6 +16,8 @@ pub enum OpCode {
   SetGlobal(usize),
   GetUpvalue(usize),
   SetUpvalue(usize),
+  GetProperty(String),
+  SetProperty(String),
   Equal,
   GreaterThan,
   LessThan,

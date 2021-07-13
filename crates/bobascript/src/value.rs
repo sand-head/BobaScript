@@ -1,4 +1,4 @@
-use std::{cell::RefCell, convert::TryInto, fmt, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::TryInto, fmt, rc::Rc};
 
 use crate::{chunk::Chunk, vm::RuntimeError};
 
@@ -47,6 +47,7 @@ pub enum Upvalue {
 #[derive(Debug, Clone)]
 pub enum Value {
   Tuple(Box<[Value]>),
+  Record(HashMap<String, Value>),
   Number(f64),
   Boolean(bool),
   String(String),
@@ -120,6 +121,14 @@ impl TryInto<String> for Value {
         tuple
           .iter()
           .map(|v| format!("{}", v))
+          .collect::<Vec<String>>()
+          .join(", ")
+      )),
+      Self::Record(record) => Ok(format!(
+        "#{{{}}}",
+        record
+          .iter()
+          .map(|(k, v)| format!("\"{}\": {}", k, v))
           .collect::<Vec<String>>()
           .join(", ")
       )),

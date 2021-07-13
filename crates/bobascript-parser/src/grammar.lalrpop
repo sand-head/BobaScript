@@ -77,6 +77,7 @@ Prefix: Box<Expr> = {
 };
 Suffix: Box<Expr> = {
   Atom,
+  <Suffix> "." <Ident> => Box::new(Expr::Property(<>)),
   <Suffix> "[" <Expr> "]" => Box::new(Expr::Index(<>)),
   <Suffix> "(" <Comma<Expr>> ")" => Box::new(Expr::Call(<>)),
 }

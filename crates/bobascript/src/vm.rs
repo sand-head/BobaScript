@@ -263,6 +263,18 @@ impl VM {
           tuple.reverse();
           self.push(Value::Tuple(tuple.into_boxed_slice()));
         }
+        OpCode::Record(length) => {
+          let mut record = HashMap::new();
+          for _ in 0..length {
+            let name = self.peek(0).unwrap().clone();
+            if let Value::String(name) = name {
+              self.pop();
+              let value = self.pop().unwrap();
+              record.insert(name, value);
+            }
+          }
+          self.push(Value::Record(record));
+        }
         OpCode::Constant(idx) => {
           let constant = self.frame().closure.function.chunk.constants[idx].clone();
           self.push(constant);
@@ -327,6 +339,17 @@ impl VM {
             Upvalue::Closed(value) => *value = new_value,
           };
         }
+        OpCode::GetProperty(name) => {
+          let instance = self.peek(0).unwrap().clone();
+          if let Value::Record(record) = instance {
+            if record.contains_key(&name) {
+              self.pop(); // drop the instance
+              let property = record.get(&name).unwrap().clone();
+              self.push(property); // push the property
+            }
+          }
+        }
+        OpCode::SetProperty(name) => {}
         OpCode::Equal => {
           let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
           let a = self.pop().ok_or_else(|| RuntimeError::Unknown)?;

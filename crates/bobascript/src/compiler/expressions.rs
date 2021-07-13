@@ -21,7 +21,8 @@ impl Compiler {
       Expr::Assign(name, op, expr) => self.assign_expr(name, op, expr),
       Expr::Binary(lhs, op, rhs) => self.binary_expr(lhs, op, rhs),
       Expr::Unary(op, expr) => self.unary_expr(op, expr),
-      Expr::Index(object, index) => self.index_expr(object, index),
+      Expr::Property(expr, prop) => self.property_expr(expr, prop),
+      Expr::Index(expr, index) => self.index_expr(expr, index),
       Expr::Call(function, args) => self.call_expr(function, args),
       Expr::Constant(constant) => self.constant_expr(constant),
     }
@@ -245,8 +246,13 @@ impl Compiler {
     }
   }
 
-  fn index_expr(&mut self, object: &Box<Expr>, index: &Box<Expr>) {
-    self.expression(object);
+  fn property_expr(&mut self, expr: &Box<Expr>, prop: &String) {
+    self.expression(expr);
+    self.emit_opcode(OpCode::GetProperty(prop.clone()));
+  }
+
+  fn index_expr(&mut self, expr: &Box<Expr>, index: &Box<Expr>) {
+    self.expression(expr);
     self.expression(index);
     self.emit_opcode(OpCode::Index);
   }
@@ -287,7 +293,13 @@ impl Compiler {
         self.emit_opcode(OpCode::Tuple(tuple.len().try_into().unwrap()));
       }
       Constant::Record(record) => {
-        todo!("records not implemented")
+        for (prop, expr) in record {
+          self.expression(&expr);
+          let prop = prop[1..(prop.len() - 1)].to_string();
+          let idx = self.make_constant(Value::String(prop));
+          self.emit_opcode(OpCode::Constant(idx));
+        }
+        self.emit_opcode(OpCode::Record(record.len().try_into().unwrap()));
       }
     }
   }
