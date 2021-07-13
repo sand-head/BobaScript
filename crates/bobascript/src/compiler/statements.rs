@@ -7,7 +7,6 @@ use super::{compiler::Compiler, CompileError, FunctionType};
 impl Compiler {
   pub fn statement(&mut self, stmt: &Box<Stmt>) {
     match &**stmt {
-      Stmt::Class(_) => todo!("handle class statements"),
       Stmt::Function(ident, args, block) => self.function_stmt(ident, args, block),
       Stmt::Const(_, _) => self.const_stmt(),
       Stmt::Let(ident, expr) => self.let_stmt(ident, expr),

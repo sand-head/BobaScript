@@ -19,7 +19,6 @@ pub Stmts = {
   Stmt*
 };
 pub Stmt: Box<Stmt> = {
-  Class,
   Function,
   Declaration,
   Return,
@@ -27,9 +26,6 @@ pub Stmt: Box<Stmt> = {
   // the last character is a right brace (})...
   // screw it! every statement now requires a semicolon
   <Expr> ";" => Box::new(Stmt::Expression(<>)),
-};
-Class: Box<Stmt> = {
-  "class" <Ident> "{" "}" ";" => Box::new(Stmt::Class(<>))
 };
 Function: Box<Stmt> = {
   "fn" <Ident> "(" <Comma<Ident>> ")" <Block> ";" => Box::new(Stmt::Function(<>)),

@@ -4,7 +4,6 @@ pub type Ast = Vec<Box<Stmt>>;
 
 #[derive(Debug)]
 pub enum Stmt {
-  Class(String),
   Function(String, Vec<String>, Box<Expr>),
   Const(String, Box<Expr>),
   Let(String, Option<Box<Expr>>),
