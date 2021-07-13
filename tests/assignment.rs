@@ -115,17 +115,11 @@ fn syntax() {
 #[test]
 fn undefined() {
   let mut vm = VM::new();
-  let function = compile(
+  assert_runtime_err!(
+    vm,
     r#"
     unknown = "what";
     "#,
-  )
-  .unwrap();
-  let result = vm.interpret(function);
-  println!("result: {:?}", result);
-  assert!(result.is_err());
-  assert_runtime_err!(
-    result,
     RuntimeError::UndefinedVariable("unknown".to_string())
   );
 }

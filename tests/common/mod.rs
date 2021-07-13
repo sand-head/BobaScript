@@ -11,9 +11,13 @@ macro_rules! assert_eval {
 
 #[macro_export]
 macro_rules! assert_runtime_err {
-  ($result:expr, $expected:expr) => {
+  ($vm:expr, $script:expr, $expected:expr) => {
+    let function = bobascript::compiler::compile($script).unwrap();
+    let result = $vm.interpret(function);
+    println!("result: {:?}", result);
+    assert!(result.is_err());
     assert!(
-      if let Err(bobascript::InterpretError::RuntimeError(result)) = $result {
+      if let Err(bobascript::InterpretError::RuntimeError(result)) = result {
         std::mem::discriminant(&result) == std::mem::discriminant(&$expected)
       } else {
         false

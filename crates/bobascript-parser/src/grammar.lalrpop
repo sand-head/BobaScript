@@ -4,6 +4,15 @@ use crate::ast::{Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
 
 grammar;
 
+match {
+  // ignore whitespace
+  r"\s*" => {},
+  // ignore single and multi-line comments
+  r"//[^\n\r]*[\n\r]*" => {},
+  r"/\*([^\*]*\*+[^\*/])*([^\*]*\*+|[^\*])*\*/" => {},
+  _
+}
+
 Comma<T>: Vec<T> = {
   <mut v:(<T> ",")*> <e:T?> => match e {
     None => v,
@@ -67,8 +76,8 @@ Term = Precedence<TermOp, Factor>;
 Factor = Precedence<FactorOp, Exponent>;
 Exponent = Precedence<ExponentOp, Prefix>;
 Prefix: Box<Expr> = {
-  "-" <Suffix> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
-  "!" <Suffix> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
+  "-" <Prefix> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
+  "!" <Prefix> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
   Suffix,
 };
 Suffix: Box<Expr> = {
