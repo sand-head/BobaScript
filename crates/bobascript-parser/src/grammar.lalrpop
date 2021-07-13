@@ -1,0 +1,176 @@
+use std::str::FromStr;
+use std::collections::HashMap;
+use crate::ast::{Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
+
+grammar;
+
+Comma<T>: Vec<T> = {
+  <mut v:(<T> ",")*> <e:T?> => match e {
+    None => v,
+    Some(e) => {
+      v.push(e);
+      v
+    }
+  },
+};
+
+// statements!
+pub Stmts = {
+  Stmt*
+};
+pub Stmt: Box<Stmt> = {
+  Function,
+  Declaration,
+  Return,
+  // I don't know how to make statements not require semicolons if
+  // the last character is a right brace (})...
+  // screw it! every statement now requires a semicolon
+  <Expr> ";" => Box::new(Stmt::Expression(<>)),
+};
+Function: Box<Stmt> = {
+  "fn" <Ident> "(" <Comma<Ident>> ")" <Block> ";" => Box::new(Stmt::Function(<>)),
+};
+Declaration: Box<Stmt> = {
+  "const" <Ident> "=" <Expr> ";" => Box::new(Stmt::Const(<>)),
+  "let" <n:Ident> <v:("=" <Expr>)?> ";" => Box::new(Stmt::Let(<>)),
+};
+Return: Box<Stmt> = {
+  "return" <Expr?> ";" => Box::new(Stmt::Return(<>)),
+};
+Break: Box<Stmt> = {
+  "break" <Expr?> ";" => Box::new(Stmt::Break(<>)),
+};
+
+// expressions!
+
+pub Expr: Box<Expr> = {
+  Assignment,
+};
+
+// precedence stuff
+
+Precedence<Op, Next>: Box<Expr> = {
+  Precedence<Op, Next> Op Next => Box::new(Expr::Binary(<>)),
+  Next,
+};
+
+Assignment: Box<Expr> = {
+  // right-to-left assoc:
+  Or AssignOp Assignment => Box::new(Expr::Assign(<>)),
+  Or,
+};
+Or = Precedence<OrOp, And>;
+And = Precedence<AndOp, Equality>;
+Equality = Precedence<EqualityOp, Comparison>;
+Comparison = Precedence<ComparisonOp, Term>;
+Term = Precedence<TermOp, Factor>;
+Factor = Precedence<FactorOp, Exponent>;
+Exponent = Precedence<ExponentOp, Prefix>;
+Prefix: Box<Expr> = {
+  "-" <Suffix> => Box::new(Expr::Unary(UnaryOp::Negate, <>)),
+  "!" <Suffix> => Box::new(Expr::Unary(UnaryOp::Not, <>)),
+  Suffix,
+};
+Suffix: Box<Expr> = {
+  Atom,
+  <Suffix> "." <Ident> => Box::new(Expr::Property(<>)),
+  <Suffix> "[" <Expr> "]" => Box::new(Expr::Index(<>)),
+  <Suffix> "(" <Comma<Expr>> ")" => Box::new(Expr::Call(<>)),
+}
+
+AssignOp: AssignOp = {
+  "=" => AssignOp::Assign,
+  "+=" => AssignOp::AddAssign,
+  "-=" => AssignOp::SubtractAssign,
+  "*=" => AssignOp::MultiplyAssign,
+  "/=" => AssignOp::DivideAssign,
+  "^=" => AssignOp::ExponentAssign,
+  "||=" => AssignOp::OrAssign,
+  "&&=" => AssignOp::AndAssign,
+};
+OrOp: BinaryOp = {
+  "or" => BinaryOp::Or,
+  "||" => BinaryOp::Or,
+};
+AndOp: BinaryOp = {
+  "and" => BinaryOp::And,
+  "&&" => BinaryOp::And,
+};
+EqualityOp: BinaryOp = {
+  "==" => BinaryOp::Equal,
+  "!=" => BinaryOp::NotEqual,
+};
+ComparisonOp: BinaryOp = {
+  ">=" => BinaryOp::GreaterEqual,
+  "<=" => BinaryOp::LessEqual,
+  ">" => BinaryOp::GreaterThan,
+  "<" => BinaryOp::LessThan,
+};
+TermOp: BinaryOp = {
+  "+" => BinaryOp::Add,
+  "-" => BinaryOp::Subtract,
+};
+FactorOp: BinaryOp = {
+  "*" => BinaryOp::Multiply,
+  "/" => BinaryOp::Divide,
+};
+ExponentOp: BinaryOp = { "^" => BinaryOp::Exponent };
+
+// statement-expressions are statement-like in nature
+// and are commonly found as statements in other languages
+
+StmtExpr: Box<Expr> = {
+  "log" "(" <Expr> ")" => Box::new(Expr::Log(<>)),
+  If,
+  While,
+};
+If: Box<Expr> = {
+  "if" <c:Expr> <t:Block> => Box::new(Expr::If(c, t, None)),
+  "if" <c:Expr> <t:Block> "else" <f:BlockOrIf> => Box::new(Expr::If(c, t, Some(f))),
+};
+While: Box<Expr> = {
+  "while" <Expr> "{" <Stmt*> "}" => Box::new(Expr::While(<>)),
+};
+
+BlockOrIf = {
+  Block,
+  If
+};
+
+// basic building blocks
+
+Atom: Box<Expr> = {
+  "true" => Box::new(Expr::Constant(Constant::True)),
+  "false" => Box::new(Expr::Constant(Constant::False)),
+  Ident => Box::new(Expr::Constant(Constant::Ident(<>))),
+  Number => Box::new(Expr::Constant(Constant::Number(<>))),
+  String => Box::new(Expr::Constant(Constant::String(<>))),
+  Tuple => Box::new(Expr::Constant(Constant::Tuple(<>))),
+  Record => Box::new(Expr::Constant(Constant::Record(<>))),
+  Block,
+  // groupings:
+  "(" <Expr> ")",
+  StmtExpr
+};
+
+Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
+Number: f64 = r"[0-9]+(.[0-9]+)*" => f64::from_str(<>).unwrap();
+String: String = r#""(?:[^"\\]|\\.)*""# => <>.to_string();
+Tuple: Vec<Box<Expr>> = {
+  "#" "[" "]" => vec![],
+  "#" "[" <mut v:(<Expr> ",")+> <e:Expr?> "]" => match e {
+    None => v,
+    Some(e) => {
+      v.push(e);
+      v
+    }
+  },
+};
+Record: HashMap<String, Box<Expr>> = "#" "{" <Comma<Field>> "}" => <>.into_iter().collect();
+Block: Box<Expr> = {
+  "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
+};
+
+Field: (String, Box<Expr>) = {
+  <String> ":" <Expr> => (<>),
+};

@@ -4,7 +4,6 @@ use thiserror::Error;
 
 use crate::{
   chunk::{JumpDirection, OpCode},
-  compiler::{compile, compile_expr},
   debug::disassemble_instruction,
   value::{Closure, Function, NativeFunction, Upvalue, Value},
   InterpretResult,
@@ -38,6 +37,12 @@ pub enum RuntimeError {
   IncorrectParameterCount(u8, u8),
   #[error("Stack overflow.")]
   StackOverflow,
+  #[error(r#"Could not index value "{0}" by value "{1}"."#)]
+  InvalidIndex(String, String),
+  #[error("Only records have properties.")]
+  NoProperties,
+  #[error(r#"Properties on records are immutable and cannot be changed directly. You may want to use "with" syntax here."#)]
+  ImmutableSet,
 }
 
 struct CallFrame {
@@ -78,12 +83,7 @@ impl VM {
     self.pop_n(2);
   }
 
-  pub fn interpret<S>(&mut self, source: S) -> InterpretResult<Value>
-  where
-    S: Into<String>,
-  {
-    let function = compile(source)?;
-
+  pub fn interpret(&mut self, function: Rc<Function>) -> InterpretResult<()> {
     self.push(Value::Function(function.clone()));
     let closure = Closure {
       function,
@@ -96,15 +96,10 @@ impl VM {
     let result = self.run();
     self.stack.clear();
     self.frames.clear();
-    result
+    result.map(|_| ())
   }
 
-  pub fn evaluate<S>(&mut self, expression: S) -> InterpretResult<Value>
-  where
-    S: Into<String>,
-  {
-    let function = compile_expr(expression)?;
-
+  pub fn evaluate(&mut self, function: Rc<Function>) -> InterpretResult<Value> {
     self.push(Value::Function(function.clone()));
     let closure = Closure {
       function,
@@ -243,7 +238,7 @@ impl VM {
 
   fn run(&mut self) -> InterpretResult<Value> {
     loop {
-      let (instruction, line) = {
+      let instruction = {
         let frame = self.frame();
         let instruction = frame.closure.function.chunk.code[frame.ip].clone();
         self.frame_mut().ip += 1;
@@ -259,7 +254,6 @@ impl VM {
         disassemble_instruction(
           &self.frame().closure.function.chunk,
           &instruction,
-          &line,
           self.frame().ip,
         );
       }
@@ -272,6 +266,18 @@ impl VM {
           }
           tuple.reverse();
           self.push(Value::Tuple(tuple.into_boxed_slice()));
+        }
+        OpCode::Record(length) => {
+          let mut record = HashMap::new();
+          for _ in 0..length {
+            let name = self.peek(0).unwrap().clone();
+            if let Value::String(name) = name {
+              self.pop();
+              let value = self.pop().unwrap();
+              record.insert(name, value);
+            }
+          }
+          self.push(Value::Record(record));
         }
         OpCode::Constant(idx) => {
           let constant = self.frame().closure.function.chunk.constants[idx].clone();
@@ -336,6 +342,28 @@ impl VM {
             Upvalue::Open(idx) => self.stack[*idx] = new_value,
             Upvalue::Closed(value) => *value = new_value,
           };
+        }
+        OpCode::GetProperty(name) => {
+          let value = self.peek(0).unwrap().clone();
+          match value {
+            Value::Record(record) => {
+              if record.contains_key(&name) {
+                self.pop(); // drop the instance
+                let property = record.get(&name).unwrap().clone();
+                self.push(property); // push the property
+              }
+            }
+            _ => break Err(RuntimeError::NoProperties.into()),
+          }
+        }
+        OpCode::SetProperty(name) => {
+          let value = self.peek(0).unwrap().clone();
+          match value {
+            Value::Record(_) => {
+              break Err(RuntimeError::ImmutableSet.into());
+            }
+            _ => break Err(RuntimeError::NoProperties.into()),
+          }
         }
         OpCode::Equal => {
           let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
@@ -425,6 +453,29 @@ impl VM {
           if !condition {
             self.frame_mut().ip += offset;
           }
+        }
+        OpCode::Index => {
+          let index = self.pop().unwrap();
+          let object = self.pop().unwrap();
+
+          match (&object, &index) {
+            (Value::Tuple(tuple), Value::Number(num)) => {
+              let num = num.round() as usize;
+              if num > 0 && num < tuple.len() {
+                self.push(tuple[num].clone());
+                Ok(())
+              } else {
+                Err(RuntimeError::InvalidIndex(
+                  object.to_string(),
+                  index.to_string(),
+                ))
+              }
+            }
+            (_, _) => Err(RuntimeError::InvalidIndex(
+              object.to_string(),
+              index.to_string(),
+            )),
+          }?;
         }
         OpCode::Call(args) => {
           self.call_value(self.peek(args as usize).unwrap().clone(), args)?;
