@@ -45,11 +45,11 @@ fn scope() {
     {
       let a = "inner";
       log(a);
-      result = result and a == "inner";
+      result &&= a == "inner";
     };
 
     log(a);
-    result = result and a == "outer";
+    result &&= a == "outer";
     "#,
   )
   .unwrap();

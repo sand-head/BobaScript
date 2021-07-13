@@ -45,22 +45,6 @@ fn global() {
   assert_eval!(vm, r#"a = "arg""#, Value::String("arg".to_string()));
 }
 
-// actually, I decided this is weird but ok for now,
-// since lalrpop gives us groupings essentially for free
-// go buck wild with 'em for all I care
-// #[test]
-// fn grouping() {
-//   let result = compile(
-//     r#"
-//     let a = "a";
-//     (a) = "value";
-//     "#,
-//   );
-//   println!("result: {:?}", result);
-//   assert!(result.is_err());
-//   assert_compile_err!(result, CompileError::InvalidAssignmentTarget);
-// }
-
 #[test]
 fn infix_operator() {
   let result = compile(
@@ -127,25 +111,6 @@ fn syntax() {
   assert_eval!(vm, "a", Value::String("var".to_string()));
   assert_eval!(vm, "c", Value::String("var".to_string()));
 }
-
-// we don't have classes yet, so why test for them?
-// #[test]
-// fn to_this() {
-//   let result = compile(
-//     r#"
-//     class Foo {
-//       Foo() {
-//         this = "value";
-//       };
-//     };
-
-//     Foo();
-//     "#,
-//   );
-//   println!("result: {:?}", result);
-//   assert!(result.is_err());
-//   assert_compile_err!(result, CompileError::InvalidAssignmentTarget);
-// }
 
 #[test]
 fn undefined() {

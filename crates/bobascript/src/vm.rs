@@ -39,6 +39,10 @@ pub enum RuntimeError {
   StackOverflow,
   #[error(r#"Could not index value "{0}" by value "{1}"."#)]
   InvalidIndex(String, String),
+  #[error("Only records have properties.")]
+  NoProperties,
+  #[error(r#"Properties on records are immutable and cannot be changed directly. You may want to use "with" syntax here."#)]
+  ImmutableSet,
 }
 
 struct CallFrame {
@@ -340,16 +344,27 @@ impl VM {
           };
         }
         OpCode::GetProperty(name) => {
-          let instance = self.peek(0).unwrap().clone();
-          if let Value::Record(record) = instance {
-            if record.contains_key(&name) {
-              self.pop(); // drop the instance
-              let property = record.get(&name).unwrap().clone();
-              self.push(property); // push the property
+          let value = self.peek(0).unwrap().clone();
+          match value {
+            Value::Record(record) => {
+              if record.contains_key(&name) {
+                self.pop(); // drop the instance
+                let property = record.get(&name).unwrap().clone();
+                self.push(property); // push the property
+              }
             }
+            _ => break Err(RuntimeError::NoProperties.into()),
           }
         }
-        OpCode::SetProperty(name) => {}
+        OpCode::SetProperty(name) => {
+          let value = self.peek(0).unwrap().clone();
+          match value {
+            Value::Record(_) => {
+              break Err(RuntimeError::ImmutableSet.into());
+            }
+            _ => break Err(RuntimeError::NoProperties.into()),
+          }
+        }
         OpCode::Equal => {
           let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
           let a = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
