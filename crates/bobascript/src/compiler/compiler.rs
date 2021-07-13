@@ -175,7 +175,7 @@ impl Compiler {
     self.end_scope();
   }
 
-  fn begin_scope(&mut self) {
+  pub(super) fn begin_scope(&mut self) {
     self.context_mut().scope_depth += 1;
   }
 

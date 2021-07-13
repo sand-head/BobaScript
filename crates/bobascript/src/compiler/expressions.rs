@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, rc::Rc};
 
 use bobascript_parser::ast::{AssignOp, BinaryOp, Constant, Expr, Stmt, UnaryOp};
 
@@ -7,7 +7,7 @@ use crate::{
   value::Value,
 };
 
-use super::{compiler::Compiler, CompileError};
+use super::{compiler::Compiler, CompileError, FunctionType};
 
 impl Compiler {
   pub fn expression(&mut self, expr: &Box<Expr>) {
@@ -34,9 +34,21 @@ impl Compiler {
   }
 
   fn block_expr(&mut self, stmts: &Vec<Box<Stmt>>, expr: &Option<Box<Expr>>) {
-    self.with_scope(|c| {
+    // todo: maybe only compile blocks as functions in some cases instead of all
+    // self.with_scope(|c| {
+    //   c.block(stmts, expr);
+    // });
+    let context = self.with_context(FunctionType::Block, |c| {
+      c.begin_scope();
       c.block(stmts, expr);
+      c.emit_opcode(OpCode::Return);
     });
+
+    // todo: disassemble the chunk
+
+    let idx = self.make_constant(Value::Function(Rc::new(context.function)));
+    self.emit_opcode(OpCode::Closure(idx, context.upvalues));
+    self.emit_opcode(OpCode::Call(0));
   }
 
   fn if_expr(

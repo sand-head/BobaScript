@@ -53,6 +53,8 @@ pub struct Local {
 pub enum FunctionType {
   /// The root (or top) level script.
   TopLevel,
+  /// A block expression.
+  Block,
   /// A function within the script.
   Function,
 }
