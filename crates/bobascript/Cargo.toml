@@ -1,5 +1,6 @@
 [package]
 name = "bobascript"
+description = "a nice, cold, refreshing scripting language built in Rust"
 version = "0.1.0"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
