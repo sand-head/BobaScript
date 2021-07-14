@@ -5,6 +5,8 @@ authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
 license = "MIT"
 repository = "https://github.com/sand-head/BobaScript"
+# temporarily do not publish the CLI
+publish = false
 
 [workspace]
 members = [
