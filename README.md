@@ -3,14 +3,13 @@
   <h1 align="center">BobaScript</h1>
 </p>
 
-<p align="center">
-  <a href="https://github.com/sand-head/BobaScript/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.shields.io/github/workflow/status/sand-head/BobaScript/CI?event=push&style=flat-square" />
-  </a>
-  <a href="https://open.vscode.dev/sand-head/BobaScript" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.shields.io/badge/open-in_Visual_Studio_Code-blue?logo=visualstudiocode&style=flat-square" />
-  </a>
-</p>
+<div align="center">
+
+  [![Crates.io](https://img.shields.io/crates/v/bobascript?style=flat-square)](https://crates.io/crates/bobascript)
+  [![CI](https://img.shields.io/github/workflow/status/sand-head/BobaScript/CI?event=push&style=flat-square)](https://github.com/sand-head/BobaScript/actions/workflows/ci.yml)
+  [![Open in VS Code](https://img.shields.io/badge/open-in_Visual_Studio_Code-blue?logo=visualstudiocode&style=flat-square)](https://open.vscode.dev/sand-head/BobaScript)
+
+</div>
 
 a nice, cold, refreshing scripting language built in Rust, with some fun little gimmicks!
 
