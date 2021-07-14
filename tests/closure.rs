@@ -4,7 +4,7 @@ mod common;
 
 #[test]
 fn closures_with_open_upvalues_work() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     fn outer() {
@@ -24,7 +24,7 @@ fn closures_with_open_upvalues_work() {
 
 #[test]
 fn closures_with_closed_upvalues_work() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     fn outer() {

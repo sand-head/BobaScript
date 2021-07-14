@@ -16,7 +16,7 @@ impl Compiler {
     }
   }
 
-  fn function_stmt(&mut self, ident: &String, args: &Vec<String>, block: &Box<Expr>) {
+  fn function_stmt(&mut self, ident: &str, args: &Vec<String>, block: &Box<Expr>) {
     let global_idx = self.declare_variable(ident);
     self.mark_initialized();
     self.function(FunctionType::Function, ident, args, block);
@@ -27,7 +27,7 @@ impl Compiler {
     todo!("add const statement");
   }
 
-  fn let_stmt(&mut self, ident: &String, expr: &Option<Box<Expr>>) {
+  fn let_stmt(&mut self, ident: &str, expr: &Option<Box<Expr>>) {
     let global = self.declare_variable(ident);
 
     if let Some(expr) = expr {

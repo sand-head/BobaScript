@@ -4,7 +4,7 @@ mod common;
 
 #[test]
 fn concatenation() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     let test = "1" + {
@@ -21,7 +21,7 @@ fn concatenation() {
 
 #[test]
 fn empty() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     {};
@@ -36,7 +36,7 @@ fn empty() {
 
 #[test]
 fn scope() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     let result = true;

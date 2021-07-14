@@ -52,14 +52,14 @@ struct CallFrame {
 }
 
 pub struct VM {
-  log_handler: Option<Box<dyn FnMut(Value) -> ()>>,
+  log_handler: Option<Box<dyn FnMut(Value)>>,
   frames: Vec<CallFrame>,
   stack: Vec<Value>,
   globals: HashMap<String, Value>,
   upvalues: Vec<Rc<RefCell<Upvalue>>>,
 }
-impl VM {
-  pub fn new() -> Self {
+impl Default for VM {
+  fn default() -> Self {
     Self {
       log_handler: None,
       frames: Vec::with_capacity(64),
@@ -68,8 +68,9 @@ impl VM {
       upvalues: Vec::new(),
     }
   }
-
-  pub fn add_log_handler(&mut self, handler: Box<dyn FnMut(Value) -> ()>) {
+}
+impl VM {
+  pub fn add_log_handler(&mut self, handler: Box<dyn FnMut(Value)>) {
     self.log_handler = Some(handler);
   }
 
@@ -146,12 +147,7 @@ impl VM {
   where
     Value: TryInto<T, Error = RuntimeError>,
   {
-    Ok(
-      self
-        .pop()
-        .ok_or_else(|| RuntimeError::Unknown)?
-        .try_into()?,
-    )
+    Ok(self.pop().ok_or(RuntimeError::Unknown)?.try_into()?)
   }
 
   fn peek_and_pop_as<T>(&mut self) -> InterpretResult<T>
@@ -160,7 +156,7 @@ impl VM {
   {
     let value: T = self
       .peek(0)
-      .ok_or_else(|| RuntimeError::Unknown)?
+      .ok_or(RuntimeError::Unknown)?
       .to_owned()
       .try_into()?;
     self.pop();
@@ -312,7 +308,7 @@ impl VM {
           let value = self
             .globals
             .get(&name)
-            .ok_or_else(|| RuntimeError::UndefinedVariable(name))?
+            .ok_or(RuntimeError::UndefinedVariable(name))?
             .clone();
 
           self.push(value);
@@ -325,7 +321,7 @@ impl VM {
           *self
             .globals
             .get_mut(&name)
-            .ok_or_else(|| RuntimeError::UndefinedVariable(name))? = new_value;
+            .ok_or(RuntimeError::UndefinedVariable(name))? = new_value;
         }
         OpCode::GetUpvalue(idx) => {
           let upvalue = &self.frame().closure.upvalues[idx];
@@ -366,8 +362,8 @@ impl VM {
           }
         }
         OpCode::Equal => {
-          let b = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
-          let a = self.pop().ok_or_else(|| RuntimeError::Unknown)?;
+          let b = self.pop().ok_or(RuntimeError::Unknown)?;
+          let a = self.pop().ok_or(RuntimeError::Unknown)?;
           let value = Value::equal(&a, &b);
           self.push(Value::Boolean(value));
         }
@@ -380,8 +376,8 @@ impl VM {
           self.push(Value::Boolean(value));
         }
         OpCode::Add => {
-          let b = self.peek(0).ok_or_else(|| RuntimeError::Unknown)?;
-          let a = self.peek(1).ok_or_else(|| RuntimeError::Unknown)?;
+          let b = self.peek(0).ok_or(RuntimeError::Unknown)?;
+          let a = self.peek(1).ok_or(RuntimeError::Unknown)?;
 
           match (a, b) {
             (Value::Number(_), Value::Number(_)) => {
@@ -403,8 +399,8 @@ impl VM {
           self.push(Value::Number(value));
         }
         OpCode::Multiply => {
-          let b = self.peek(0).ok_or_else(|| RuntimeError::Unknown)?;
-          let a = self.peek(1).ok_or_else(|| RuntimeError::Unknown)?;
+          let b = self.peek(0).ok_or(RuntimeError::Unknown)?;
+          let a = self.peek(1).ok_or(RuntimeError::Unknown)?;
 
           match (a, b) {
             (Value::Number(_), Value::Number(_)) => {
@@ -506,7 +502,7 @@ impl VM {
           self.pop();
         }
         OpCode::Return => {
-          let result = self.pop().unwrap_or_else(|| Value::get_unit());
+          let result = self.pop().unwrap_or_else(Value::get_unit);
           self.close_upvalues(self.frame().slots_start);
           if self.frames.len() == 1 {
             // if this is the last frame, pop it and break the loop

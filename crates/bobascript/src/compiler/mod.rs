@@ -84,9 +84,9 @@ impl CompileContext {
     &mut self.function.chunk
   }
 
-  fn resolve_local(&self, name: &String) -> CompileResult<Option<usize>> {
+  fn resolve_local(&self, name: &str) -> CompileResult<Option<usize>> {
     for i in (0..self.locals.len()).rev() {
-      if name == &self.locals[i].name {
+      if name == self.locals[i].name {
         return if self.locals[i].depth == -1 {
           Err(CompileError::VariableDoesNotExist(
             self.locals[i].name.clone(),

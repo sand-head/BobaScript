@@ -8,7 +8,7 @@ mod common;
 
 #[test]
 fn associativity() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     let a = "a";
@@ -31,7 +31,7 @@ fn associativity() {
 
 #[test]
 fn global() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(r#"let a = "before";"#).unwrap();
   let result = vm.interpret(function);
   assert!(result.is_ok());
@@ -61,7 +61,7 @@ fn infix_operator() {
 
 #[test]
 fn local() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     {
@@ -97,7 +97,7 @@ fn prefix_operator() {
 
 #[test]
 fn syntax() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     let a = "before";
@@ -114,7 +114,7 @@ fn syntax() {
 
 #[test]
 fn undefined() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_runtime_err!(
     vm,
     r#"

@@ -29,7 +29,7 @@ impl Compiler {
     self.emit_opcode(OpCode::Tuple(0));
     let function = self.end_compiler();
 
-    if self.errors.len() > 0 {
+    if self.errors.is_empty() {
       let first = self.errors.pop().unwrap();
       self.errors.clear();
       Err(first)
@@ -43,7 +43,7 @@ impl Compiler {
     self.expression(expr);
 
     let function = self.end_compiler();
-    if self.errors.len() > 0 {
+    if self.errors.is_empty() {
       let first = self.errors.pop().unwrap();
       self.errors.clear();
       Err(first)
@@ -58,7 +58,7 @@ impl Compiler {
 
   pub(super) fn with_context<F>(&mut self, fn_type: FunctionType, f: F) -> CompileContext
   where
-    F: FnOnce(&mut Compiler) -> (),
+    F: FnOnce(&mut Compiler),
   {
     self.contexts.push(CompileContext::new(fn_type));
     f(self);
@@ -88,13 +88,13 @@ impl Compiler {
   pub(super) fn function(
     &mut self,
     fn_type: FunctionType,
-    ident: &String,
+    ident: &str,
     args: &Vec<String>,
     block: &Box<Expr>,
   ) {
     let context = self.with_context(fn_type, |c| {
       if fn_type != FunctionType::TopLevel {
-        c.context_mut().function.name = ident.clone();
+        c.context_mut().function.name = ident.to_string();
       }
       c.begin_scope();
 
@@ -121,7 +121,7 @@ impl Compiler {
     if crate::DEBUG && (self.errors.is_empty() || crate::SUPER_DEBUG) {
       disassemble_chunk(
         &context.function.chunk,
-        if context.function.name.len() > 0 {
+        if context.function.name.is_empty() {
           &context.function.name
         } else {
           "[script]"
@@ -168,7 +168,7 @@ impl Compiler {
 
   pub(super) fn with_scope<F>(&mut self, f: F)
   where
-    F: FnOnce(&mut Compiler) -> (),
+    F: FnOnce(&mut Compiler),
   {
     self.begin_scope();
     f(self);
@@ -207,7 +207,7 @@ impl Compiler {
   }
 
   /// Adds a variable to the scope
-  pub(super) fn declare_variable(&mut self, name: &String) -> usize {
+  pub(super) fn declare_variable(&mut self, name: &str) -> usize {
     if self.context().scope_depth > 0 {
       let name_exists = self
         .context()
@@ -215,11 +215,10 @@ impl Compiler {
         .iter()
         .rev()
         .filter(|local| local.depth != -1 && local.depth < self.context().scope_depth)
-        .find(|local| name == &local.name)
-        .is_some();
+        .any(|local| name == local.name);
 
       if name_exists {
-        self.set_error(CompileError::VariableAlreadyExists(name.clone()));
+        self.set_error(CompileError::VariableAlreadyExists(name.to_string()));
       } else {
         self.context_mut().locals.push(Local {
           name: name.to_string(),
@@ -249,13 +248,13 @@ impl Compiler {
     }
   }
 
-  pub(super) fn resolve_variable(&mut self, name: &String) -> (OpCode, OpCode) {
+  pub(super) fn resolve_variable(&mut self, name: &str) -> (OpCode, OpCode) {
     if let Some(idx) = self.resolve_local(name, 0) {
       (OpCode::GetLocal(idx), OpCode::SetLocal(idx))
     } else if let Some(idx) = self.resolve_upvalue(name, 0) {
       (OpCode::GetUpvalue(idx), OpCode::SetUpvalue(idx))
     } else {
-      let idx = self.identifier_constant(name.clone());
+      let idx = self.identifier_constant(name.to_string());
       (OpCode::GetGlobal(idx), OpCode::SetGlobal(idx))
     }
   }
@@ -264,7 +263,7 @@ impl Compiler {
     self.make_constant(Value::String(lexeme))
   }
 
-  fn resolve_local(&mut self, name: &String, context_idx: usize) -> Option<usize> {
+  fn resolve_local(&mut self, name: &str, context_idx: usize) -> Option<usize> {
     let context = self.contexts.iter_mut().nth_back(context_idx);
     let context = match context {
       Some(c) => c,
@@ -289,10 +288,9 @@ impl Compiler {
       .nth_back(context_idx)
       .unwrap()
       .upvalues;
-    for i in 0..upvalues.len() {
-      let upvalue = upvalues[i];
+    for (i, upvalue) in upvalues.iter().enumerate() {
       if let Upvalue::Local(local_index) = upvalue {
-        if local_index == index {
+        if *local_index == index {
           return i;
         }
       }
@@ -306,7 +304,7 @@ impl Compiler {
     upvalues.len() - 1
   }
 
-  fn resolve_upvalue(&mut self, name: &String, context_idx: usize) -> Option<usize> {
+  fn resolve_upvalue(&mut self, name: &str, context_idx: usize) -> Option<usize> {
     if let Some(idx) = self.resolve_local(name, context_idx + 1) {
       self
         .contexts
@@ -320,10 +318,10 @@ impl Compiler {
       // if we continue here, we'd get stuck in an infinite loop until the stack overflows
       // this is because we are out of contexts to check
       None
-    } else if let Some(idx) = self.resolve_upvalue(name, context_idx + 1) {
-      Some(self.add_upvalue(idx, false, context_idx))
     } else {
-      None
+      self
+        .resolve_upvalue(name, context_idx + 1)
+        .map(|idx| self.add_upvalue(idx, false, context_idx))
     }
   }
 
@@ -334,7 +332,7 @@ impl Compiler {
     if crate::DEBUG && (self.errors.is_empty() || crate::SUPER_DEBUG) {
       disassemble_chunk(
         &context.function.chunk,
-        if context.function.name.len() > 0 {
+        if context.function.name.is_empty() {
           &context.function.name
         } else {
           "[script]"

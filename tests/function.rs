@@ -15,7 +15,7 @@ fn body_must_be_block() {
 
 #[test]
 fn empty_body() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     fn f() {};
@@ -29,7 +29,7 @@ fn empty_body() {
 
 #[test]
 fn recursion_works() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   let function = compile(
     r#"
     fn fib(n) {

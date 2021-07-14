@@ -4,7 +4,7 @@ mod common;
 
 #[test]
 fn equality() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_eval!(vm, "true == true", Value::Boolean(true));
   assert_eval!(vm, "true == false", Value::Boolean(false));
   assert_eval!(vm, "false == true", Value::Boolean(false));
@@ -30,7 +30,7 @@ fn equality() {
 
 #[test]
 fn not() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_eval!(vm, "!true", Value::Boolean(false));
   assert_eval!(vm, "!false", Value::Boolean(true));
   assert_eval!(vm, "!!true", Value::Boolean(true));

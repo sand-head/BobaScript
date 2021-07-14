@@ -42,7 +42,7 @@ fn main() -> InterpretResult<()> {
   rl.set_helper(Some(helper));
 
   // create our virtual machine
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   vm.add_log_handler(Box::new(log_handler));
 
   println!("Howdy! Welcome to the BobaScript REPL, enjoy your stay.");
@@ -50,11 +50,10 @@ fn main() -> InterpretResult<()> {
     match rl.readline("> ") {
       Ok(input) => {
         rl.add_history_entry(&input);
-        if input.ends_with(";") {
+        if input.ends_with(';') {
           let function = compile(input)?;
-          match vm.interpret(function) {
-            Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
-            _ => (),
+          if let Err(err) = vm.interpret(function) {
+            print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?;
           }
         } else {
           let function = compile_expr(input)?;

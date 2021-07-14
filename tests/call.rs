@@ -4,7 +4,7 @@ mod common;
 
 #[test]
 fn tuple() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_runtime_err!(
     vm,
     r#"
@@ -16,7 +16,7 @@ fn tuple() {
 
 #[test]
 fn record() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_runtime_err!(
     vm,
     r#"
@@ -28,7 +28,7 @@ fn record() {
 
 #[test]
 fn number() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_runtime_err!(
     vm,
     r#"
@@ -40,7 +40,7 @@ fn number() {
 
 #[test]
 fn bool() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_runtime_err!(
     vm,
     r#"
@@ -52,7 +52,7 @@ fn bool() {
 
 #[test]
 fn string() {
-  let mut vm = VM::new();
+  let mut vm = VM::default();
   assert_runtime_err!(
     vm,
     r#"

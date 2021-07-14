@@ -2,7 +2,7 @@ use lalrpop_util::lalrpop_mod;
 use thiserror::Error;
 
 pub mod ast;
-lalrpop_mod!(pub grammar);
+lalrpop_mod!(#[allow(clippy::all)] pub grammar);
 
 #[derive(Debug, Error, Clone)]
 pub enum SyntaxError {

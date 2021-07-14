@@ -258,9 +258,9 @@ impl Compiler {
     }
   }
 
-  fn property_expr(&mut self, expr: &Box<Expr>, prop: &String) {
+  fn property_expr(&mut self, expr: &Box<Expr>, prop: &str) {
     self.expression(expr);
-    self.emit_opcode(OpCode::GetProperty(prop.clone()));
+    self.emit_opcode(OpCode::GetProperty(prop.to_string()));
   }
 
   fn index_expr(&mut self, expr: &Box<Expr>, index: &Box<Expr>) {
@@ -289,7 +289,7 @@ impl Compiler {
         self.emit_opcode(get_op);
       }
       Constant::Number(num) => {
-        let num_idx = self.make_constant(Value::Number(num.clone()));
+        let num_idx = self.make_constant(Value::Number(*num));
         self.emit_opcode(OpCode::Constant(num_idx));
       }
       Constant::String(str) => {

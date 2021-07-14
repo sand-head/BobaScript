@@ -63,7 +63,7 @@ impl Value {
 
   pub fn equal(&self, b: &Self) -> bool {
     match (self, b) {
-      (Self::Number(a), Self::Number(b)) => *a == *b,
+      (Self::Number(a), Self::Number(b)) => (*a - *b).abs() < f64::EPSILON,
       (Self::Boolean(a), Self::Boolean(b)) => *a == *b,
       (Self::String(a), Self::String(b)) => *a == *b,
       (Self::Tuple(a), Self::Tuple(b)) => {
@@ -135,9 +135,9 @@ impl TryInto<String> for Value {
       Self::Number(num) => Ok(format!("{}", num)),
       Self::Boolean(bool) => Ok(format!("{}", bool)),
       Self::String(str) => Ok(str),
-      Self::Function(function) if function.name.len() > 0 => Ok(format!("<fn {}>", function.name)),
+      Self::Function(function) if function.name.is_empty() => Ok(format!("<fn {}>", function.name)),
       Self::NativeFunction(native_fn) => Ok(format!("{:?}", native_fn)),
-      Self::Closure(closure) if closure.function.name.len() > 0 => {
+      Self::Closure(closure) if closure.function.name.is_empty() => {
         Ok(format!("<fn {}>", closure.function.name))
       }
       Self::Function(_) | Self::Closure(_) => Ok("<script>".to_string()),
@@ -175,15 +175,11 @@ impl TryInto<Rc<RefCell<NativeFunction>>> for Value {
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      _ => {
-        let value: String = Value::try_into(self.clone()).unwrap();
-        if let Self::String(_) = self {
-          write!(f, "\"{}\"", value)
-        } else {
-          write!(f, "{}", value)
-        }
-      }
+    let value: String = Value::try_into(self.clone()).unwrap();
+    if let Self::String(_) = self {
+      write!(f, "\"{}\"", value)
+    } else {
+      write!(f, "{}", value)
     }
   }
 }
