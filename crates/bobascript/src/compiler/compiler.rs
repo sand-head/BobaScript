@@ -30,11 +30,11 @@ impl Compiler {
     let function = self.end_compiler();
 
     if self.errors.is_empty() {
+      Ok(function)
+    } else {
       let first = self.errors.pop().unwrap();
       self.errors.clear();
       Err(first)
-    } else {
-      Ok(function)
     }
   }
 
@@ -44,11 +44,11 @@ impl Compiler {
 
     let function = self.end_compiler();
     if self.errors.is_empty() {
+      Ok(function)
+    } else {
       let first = self.errors.pop().unwrap();
       self.errors.clear();
       Err(first)
-    } else {
-      Ok(function)
     }
   }
 
@@ -121,7 +121,7 @@ impl Compiler {
     if crate::DEBUG && (self.errors.is_empty() || crate::SUPER_DEBUG) {
       disassemble_chunk(
         &context.function.chunk,
-        if context.function.name.is_empty() {
+        if !context.function.name.is_empty() {
           &context.function.name
         } else {
           "[script]"
@@ -332,7 +332,7 @@ impl Compiler {
     if crate::DEBUG && (self.errors.is_empty() || crate::SUPER_DEBUG) {
       disassemble_chunk(
         &context.function.chunk,
-        if context.function.name.is_empty() {
+        if !context.function.name.is_empty() {
           &context.function.name
         } else {
           "[script]"

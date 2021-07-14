@@ -1,7 +1,10 @@
 [package]
 name = "bobascript-parser"
 version = "0.1.0"
+authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/sand-head/BobaScript"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [build-dependencies]

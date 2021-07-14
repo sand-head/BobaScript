@@ -3,6 +3,8 @@ name = "bobascript"
 version = "0.1.0"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/sand-head/BobaScript"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,6 +13,6 @@ debug = []
 super_debug = ["debug"]
 
 [dependencies]
-bobascript-parser = { path = "../bobascript-parser" }
+bobascript-parser = { path = "../bobascript-parser", version = "0.1" }
 num_enum = "0.5"
 thiserror = "1.0"
