@@ -307,7 +307,11 @@ impl Compiler {
       Constant::Record(record) => {
         for (prop, expr) in record {
           self.expression(&expr);
-          let prop = prop[1..(prop.len() - 1)].to_string();
+          let prop = if prop.starts_with('"') {
+            prop[1..(prop.len() - 1)].to_string()
+          } else {
+            prop.clone()
+          };
           let idx = self.make_constant(Value::String(prop));
           self.emit_opcode(OpCode::Constant(idx));
         }

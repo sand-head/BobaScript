@@ -181,5 +181,9 @@ Block: Box<Expr> = {
 };
 
 Field: (String, Box<Expr>) = {
-  <String> ":" <Expr> => (<>),
+  <IdentOrString> ":" <Expr> => (<>),
+};
+IdentOrString = {
+  Ident,
+  String
 };
