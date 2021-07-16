@@ -1,6 +1,6 @@
 [package]
 name = "bobascript-cli"
-version = "0.2.0"
+version = "0.1.1"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
 license = "MIT"
@@ -17,7 +17,7 @@ members = [
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-bobascript = { path = "crates/bobascript", features = ["super_debug"], version = "0.2" }
+bobascript = { path = "crates/bobascript", features = ["super_debug"], version = "0.1" }
 termcolor = "1.1"
 rustyline = "8.2"
 rustyline-derive = "0.4"
