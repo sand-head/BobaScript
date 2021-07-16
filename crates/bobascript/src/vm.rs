@@ -79,7 +79,7 @@ impl VM {
     self.push(Value::NativeFunction(function));
     self.globals.insert(
       self.stack[0].clone().try_into().unwrap(),
-      self.stack[1].clone().try_into().unwrap(),
+      self.stack[1].clone(),
     );
     self.pop_n(2);
   }
@@ -170,7 +170,7 @@ impl VM {
         Ok(())
       }
       Value::NativeFunction(native_fn) => {
-        let arg_start = self.stack.len() - 1 - (arg_count as usize);
+        let arg_start = self.stack.len() - (arg_count as usize);
         let args = &self.stack[arg_start..];
         (native_fn.borrow().function)(args)?;
         self.pop_n(arg_count as usize);
