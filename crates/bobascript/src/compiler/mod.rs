@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use bobascript_parser::{
   grammar::{ExprParser, StmtsParser},
-  SyntaxError,
+  Parser, SyntaxError,
 };
 use thiserror::Error;
 
@@ -106,10 +106,7 @@ pub fn compile<S>(source: S) -> CompileResult<Rc<Function>>
 where
   S: Into<String>,
 {
-  let parser = StmtsParser::new();
-  let ast = parser
-    .parse(&source.into())
-    .map_err(|_| CompileError::UndefinedBehavior("An unknown error occured during parsing. This will be handled in a future commit, pinky promise!".to_string()))?;
+  let ast = StmtsParser::parse_ast(&source.into())?;
   let mut compiler = Compiler::new();
   compiler.compile(&ast)
 }
@@ -119,10 +116,7 @@ pub fn compile_expr<S>(source: S) -> CompileResult<Rc<Function>>
 where
   S: Into<String>,
 {
-  let parser = ExprParser::new();
-  let ast = parser
-    .parse(&source.into())
-    .map_err(|_| CompileError::UndefinedBehavior("An unknown error occured during parsing. This will be handled in a future commit, pinky promise!".to_string()))?;
+  let ast = ExprParser::parse_ast(&source.into())?;
   let mut compiler = Compiler::new();
   compiler.compile_expr(&ast)
 }

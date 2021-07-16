@@ -25,6 +25,7 @@ impl Compiler {
       Expr::Index(expr, index) => self.index_expr(expr, index),
       Expr::Call(function, args) => self.call_expr(function, args),
       Expr::Constant(constant) => self.constant_expr(constant),
+      Expr::Error => todo!(),
     }
   }
 

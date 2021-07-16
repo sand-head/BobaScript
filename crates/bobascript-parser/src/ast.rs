@@ -14,6 +14,7 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
+  Error,
   /// Outputs the value of the contained [Expr] as a log.
   Log(Box<Expr>),
   Block(Vec<Box<Stmt>>, Option<Box<Expr>>),

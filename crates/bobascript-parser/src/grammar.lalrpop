@@ -1,8 +1,11 @@
 use std::str::FromStr;
 use std::collections::HashMap;
+
+use lalrpop_util::ParseError;
+
 use crate::ast::{Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
 
-grammar;
+grammar<'err>(errors: &'err mut Vec<ParseError<usize, Token<'input>, &'static str>>);
 
 match {
   // ignore whitespace
@@ -27,7 +30,7 @@ Comma<T>: Vec<T> = {
 pub Stmts = {
   Stmt*
 };
-pub Stmt: Box<Stmt> = {
+Stmt: Box<Stmt> = {
   Function,
   Declaration,
   Return,
@@ -159,7 +162,11 @@ Atom: Box<Expr> = {
   Block,
   // groupings:
   "(" <Expr> ")",
-  StmtExpr
+  StmtExpr,
+  ! => {
+    errors.push(<>.error);
+    Box::new(Expr::Error)
+  }
 };
 
 Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
