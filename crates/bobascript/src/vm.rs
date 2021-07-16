@@ -352,7 +352,7 @@ impl VM {
             _ => break Err(RuntimeError::NoProperties.into()),
           }
         }
-        OpCode::SetProperty(name) => {
+        OpCode::SetProperty(_name) => {
           let value = self.peek(0).unwrap().clone();
           match value {
             Value::Record(_) => {

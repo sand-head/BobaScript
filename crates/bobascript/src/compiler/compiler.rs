@@ -89,8 +89,8 @@ impl Compiler {
     &mut self,
     fn_type: FunctionType,
     ident: &str,
-    args: &Vec<String>,
-    block: &Box<Expr>,
+    args: &[String],
+    block: &Expr,
   ) {
     let context = self.with_context(fn_type, |c| {
       if fn_type != FunctionType::TopLevel {
@@ -110,7 +110,7 @@ impl Compiler {
         c.define_variable(idx);
       }
 
-      if let Expr::Block(stmts, expr) = &**block {
+      if let Expr::Block(stmts, expr) = &*block {
         c.block(stmts, expr);
         c.emit_opcode(OpCode::Return);
       } else {

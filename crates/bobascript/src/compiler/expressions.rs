@@ -10,8 +10,8 @@ use crate::{
 use super::{compiler::Compiler, CompileError, FunctionType};
 
 impl Compiler {
-  pub fn expression(&mut self, expr: &Box<Expr>) {
-    match &**expr {
+  pub fn expression(&mut self, expr: &Expr) {
+    match &*expr {
       Expr::Log(expr) => self.log_expr(expr),
       Expr::Block(stmts, expr) => self.block_expr(stmts, expr),
       Expr::If(condition, true_branch, false_branch) => {
@@ -29,7 +29,7 @@ impl Compiler {
     }
   }
 
-  fn log_expr(&mut self, expr: &Box<Expr>) {
+  fn log_expr(&mut self, expr: &Expr) {
     self.expression(&expr);
     self.emit_opcode(OpCode::Log);
   }
@@ -52,12 +52,7 @@ impl Compiler {
     self.emit_opcode(OpCode::Call(0));
   }
 
-  fn if_expr(
-    &mut self,
-    condition: &Box<Expr>,
-    true_branch: &Box<Expr>,
-    false_branch: &Option<Box<Expr>>,
-  ) {
+  fn if_expr(&mut self, condition: &Expr, true_branch: &Expr, false_branch: &Option<Box<Expr>>) {
     self.expression(&condition);
     let then_jump = self.emit_opcode_idx(OpCode::JumpIfFalse(0));
     self.emit_opcode(OpCode::Pop);
@@ -83,7 +78,7 @@ impl Compiler {
     self.patch_jump(else_jump);
   }
 
-  fn while_expr(&mut self, condition: &Box<Expr>, stmts: &Vec<Box<Stmt>>) {
+  fn while_expr(&mut self, condition: &Expr, stmts: &Vec<Box<Stmt>>) {
     let loop_start = self.context_mut().chunk_mut().code.len();
 
     self.expression(&condition);
@@ -102,8 +97,8 @@ impl Compiler {
     self.emit_opcode(OpCode::Tuple(0));
   }
 
-  fn assign_expr(&mut self, name: &Box<Expr>, op: &AssignOp, expr: &Box<Expr>) {
-    if let Expr::Constant(Constant::Ident(name)) = &**name {
+  fn assign_expr(&mut self, name: &Expr, op: &AssignOp, expr: &Expr) {
+    if let Expr::Constant(Constant::Ident(name)) = &*name {
       let (get_op, set_op) = self.resolve_variable(name);
       match op {
         AssignOp::Assign => {
@@ -166,7 +161,7 @@ impl Compiler {
     }
   }
 
-  fn binary_expr(&mut self, lhs: &Box<Expr>, op: &BinaryOp, rhs: &Box<Expr>) {
+  fn binary_expr(&mut self, lhs: &Expr, op: &BinaryOp, rhs: &Expr) {
     match op {
       BinaryOp::Or => {
         self.expression(lhs);
@@ -249,7 +244,7 @@ impl Compiler {
     }
   }
 
-  fn unary_expr(&mut self, op: &UnaryOp, expr: &Box<Expr>) {
+  fn unary_expr(&mut self, op: &UnaryOp, expr: &Expr) {
     self.expression(&expr);
 
     // emit the operator
@@ -259,18 +254,18 @@ impl Compiler {
     }
   }
 
-  fn property_expr(&mut self, expr: &Box<Expr>, prop: &str) {
+  fn property_expr(&mut self, expr: &Expr, prop: &str) {
     self.expression(expr);
     self.emit_opcode(OpCode::GetProperty(prop.to_string()));
   }
 
-  fn index_expr(&mut self, expr: &Box<Expr>, index: &Box<Expr>) {
+  fn index_expr(&mut self, expr: &Expr, index: &Expr) {
     self.expression(expr);
     self.expression(index);
     self.emit_opcode(OpCode::Index);
   }
 
-  fn call_expr(&mut self, function: &Box<Expr>, args: &Vec<Box<Expr>>) {
+  fn call_expr(&mut self, function: &Expr, args: &Vec<Box<Expr>>) {
     self.expression(function);
     for arg in args {
       self.expression(&arg);

@@ -16,7 +16,7 @@ impl Compiler {
     }
   }
 
-  fn function_stmt(&mut self, ident: &str, args: &Vec<String>, block: &Box<Expr>) {
+  fn function_stmt(&mut self, ident: &str, args: &[String], block: &Expr) {
     let global_idx = self.declare_variable(ident);
     self.mark_initialized();
     self.function(FunctionType::Function, ident, args, block);

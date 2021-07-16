@@ -1,3 +1,5 @@
+use std::{convert::From, fmt::Display, string::String};
+
 use ast::{Expr, Stmt};
 use lalrpop_util::{lalrpop_mod, ParseError};
 use thiserror::Error;
@@ -7,30 +9,45 @@ lalrpop_mod!(#[allow(clippy::all)] pub grammar);
 
 #[derive(Debug, Error, Clone)]
 pub enum SyntaxError {
-  #[error("Unexpected character '{1}' on line {0}.")]
-  UnexpectedCharacter(usize, char),
-  #[error("Unterminated string on line {0}.")]
-  UnterminatedString(usize),
+  #[error("{0}")]
+  Generic(String),
+  #[error("Expected {0}.")]
+  Expected(String),
+  #[error("Expected {0}; found token '{1}'.")]
+  UnexpectedToken(String, String),
+  #[error("Found extra token {0}.")]
+  ExtraToken(String),
+  #[error("Invalid token.")]
+  Invalid,
 }
 type Result<T> = std::result::Result<T, SyntaxError>;
 
-impl<T1, T2> From<ParseError<usize, T1, T2>> for SyntaxError {
+impl<T1, T2> From<ParseError<usize, T1, T2>> for SyntaxError
+where
+  T1: Display,
+  T2: Into<String>,
+{
   fn from(error: ParseError<usize, T1, T2>) -> Self {
     match error {
-      ParseError::InvalidToken { location } => todo!(),
-      ParseError::UnrecognizedEOF { location, expected } => todo!(),
-      ParseError::UnrecognizedToken { token, expected } => todo!(),
-      ParseError::ExtraToken { token } => todo!(),
-      ParseError::User { error } => todo!(),
+      ParseError::InvalidToken { location: _ } => SyntaxError::Invalid,
+      ParseError::UnrecognizedEOF {
+        location: _,
+        expected,
+      } => SyntaxError::Expected(expected.join(", ")),
+      ParseError::UnrecognizedToken { token, expected } => {
+        SyntaxError::UnexpectedToken(expected.join(", "), token.1.to_string())
+      }
+      ParseError::ExtraToken { token } => SyntaxError::ExtraToken(token.1.to_string()),
+      ParseError::User { error } => SyntaxError::Generic(error.into()),
     }
   }
 }
 
 pub trait Parser<T> {
-  fn parse_ast<'input>(input: &'input str) -> Result<T>;
+  fn parse_ast(input: &'_ str) -> Result<T>;
 }
 impl Parser<Vec<Box<Stmt>>> for crate::grammar::StmtsParser {
-  fn parse_ast<'input>(input: &'input str) -> Result<Vec<Box<Stmt>>> {
+  fn parse_ast(input: &'_ str) -> Result<Vec<Box<Stmt>>> {
     let parser = crate::grammar::StmtsParser::new();
     let mut errors = Vec::new();
     let expr = parser.parse(&mut errors, input);
@@ -43,7 +60,7 @@ impl Parser<Vec<Box<Stmt>>> for crate::grammar::StmtsParser {
   }
 }
 impl Parser<Box<Expr>> for crate::grammar::ExprParser {
-  fn parse_ast<'input>(input: &'input str) -> Result<Box<Expr>> {
+  fn parse_ast(input: &'_ str) -> Result<Box<Expr>> {
     let parser = crate::grammar::ExprParser::new();
     let mut errors = Vec::new();
     let expr = parser.parse(&mut errors, input);
