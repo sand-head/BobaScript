@@ -113,7 +113,7 @@ jobs:
         with:
           command: workspaces
           args: -v publish --from-git --skip-published
-      - uses: actions-rs/cargo@v1
-        with:
-          command: workspaces
-          args: -v version -ay --force '*' --no-git-tag --exact minor
+      # - uses: actions-rs/cargo@v1
+      #   with:
+      #     command: workspaces
+      #     args: -v version -ay --force '*' --no-git-tag --exact minor
