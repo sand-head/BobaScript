@@ -1,7 +1,7 @@
 [package]
 name = "bobascript"
 description = "a nice, cold, refreshing scripting language built in Rust"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
 license = "MIT"
@@ -14,6 +14,6 @@ debug = []
 super_debug = ["debug"]
 
 [dependencies]
-bobascript-parser = { path = "../bobascript-parser", version = "0.1" }
+bobascript-parser = { path = "../bobascript-parser", version = "0.1.2" }
 num_enum = "0.5"
 thiserror = "1.0"

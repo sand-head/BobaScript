@@ -1,6 +1,6 @@
 [package]
 name = "bobascript-cli"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
 license = "MIT"
