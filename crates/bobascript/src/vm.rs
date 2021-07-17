@@ -172,8 +172,9 @@ impl VM {
       Value::NativeFunction(native_fn) => {
         let arg_start = self.stack.len() - (arg_count as usize);
         let args = &self.stack[arg_start..];
-        (native_fn.borrow().function)(args)?;
+        let value = (native_fn.borrow().function)(args)?;
         self.pop_n(arg_count as usize);
+        self.push(value);
         Ok(())
       }
       _ => Err(RuntimeError::InvalidCallSignature.into()),
