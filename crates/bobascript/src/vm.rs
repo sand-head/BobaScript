@@ -173,7 +173,7 @@ impl VM {
         let arg_start = self.stack.len() - (arg_count as usize);
         let args = &self.stack[arg_start..];
         let value = (native_fn.borrow().function)(args)?;
-        self.pop_n(arg_count as usize);
+        self.pop_n(arg_count as usize + 1);
         self.push(value);
         Ok(())
       }

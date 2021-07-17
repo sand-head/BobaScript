@@ -1,4 +1,10 @@
-use bobascript::{compiler::compile, value::Value, vm::VM};
+use std::{cell::RefCell, convert::TryInto, rc::Rc};
+
+use bobascript::{
+  compiler::{compile, compile_expr},
+  value::{NativeFunction, Value},
+  vm::{RuntimeError, VM},
+};
 
 mod common;
 
@@ -45,4 +51,28 @@ fn recursion_works() {
   let result = vm.interpret(function);
   assert!(result.is_ok());
   assert_eval!(vm, "fib(10)", Value::Number(55.0));
+}
+
+#[test]
+fn native_fns_work() {
+  fn test(params: &[Value]) -> Result<Value, RuntimeError> {
+    println!("params: {:?}", params);
+    if params.len() != 2 {
+      return Err(RuntimeError::IncorrectParameterCount(
+        2,
+        params.len().try_into().unwrap(),
+      ));
+    }
+
+    let a = params.get(0).unwrap();
+    let b = params.get(1).unwrap();
+    Ok(Value::String(format!("{}{}", a, b)))
+  }
+
+  let mut vm = VM::default();
+  vm.define_native(
+    "test".to_owned(),
+    Rc::new(RefCell::new(NativeFunction { function: test })),
+  );
+  assert_eval!(vm, "test(10, 20)", Value::String("1020".to_string()));
 }
