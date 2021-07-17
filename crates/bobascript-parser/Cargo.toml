@@ -1,7 +1,7 @@
 [package]
 name = "bobascript-parser"
 description = "A parser for the scripting language BobaScript."
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Justin Schweigert <justin@schweigert.dev>"]
 edition = "2018"
 license = "MIT"
