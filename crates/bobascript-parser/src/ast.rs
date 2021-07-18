@@ -44,7 +44,7 @@ pub enum Expr {
 pub enum Constant {
   True,
   False,
-  Ident(String),
+  Ident(Vec<String>, String),
   Number(f64),
   String(String),
   Tuple(Vec<Box<Expr>>),

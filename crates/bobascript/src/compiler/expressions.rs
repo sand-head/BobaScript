@@ -98,7 +98,7 @@ impl Compiler {
   }
 
   fn assign_expr(&mut self, name: &Expr, op: &AssignOp, expr: &Expr) {
-    if let Expr::Constant(Constant::Ident(name)) = &*name {
+    if let Expr::Constant(Constant::Ident(_, name)) = &*name {
       let (get_op, set_op) = self.resolve_variable(name);
       match op {
         AssignOp::Assign => {
@@ -280,7 +280,7 @@ impl Compiler {
     match constant {
       Constant::True => self.emit_opcode(OpCode::True),
       Constant::False => self.emit_opcode(OpCode::False),
-      Constant::Ident(ident) => {
+      Constant::Ident(_, ident) => {
         let (get_op, _) = self.resolve_variable(ident);
         self.emit_opcode(get_op);
       }
