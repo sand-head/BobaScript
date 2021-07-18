@@ -3,12 +3,7 @@ use std::{
   io::{self, Write},
 };
 
-use bobascript::{
-  compiler::{compile, compile_expr},
-  value::Value,
-  vm::VM,
-  InterpretError, InterpretResult,
-};
+use bobascript::{compiler::compile, value::Value, vm::VM, InterpretError, InterpretResult};
 use rustyline::{
   error::ReadlineError,
   validate::{MatchingBracketValidator, ValidationContext, ValidationResult, Validator},
@@ -50,17 +45,9 @@ fn main() -> InterpretResult<()> {
     match rl.readline("> ") {
       Ok(input) => {
         rl.add_history_entry(&input);
-        if input.ends_with(';') {
-          let function = compile(input)?;
-          if let Err(err) = vm.interpret(function) {
-            print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?;
-          }
-        } else {
-          let function = compile_expr(input)?;
-          match vm.evaluate(function) {
-            Ok(value) => println!("< {}", value),
-            Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
-          }
+        let function = compile(input)?;
+        if let Err(err) = vm.interpret(function) {
+          print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?;
         }
       }
       Err(ReadlineError::Interrupted) => {

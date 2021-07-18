@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use lalrpop_util::ParseError;
 
-use crate::ast::{Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
+use crate::ast::{Ast, Constant, Stmt, Expr, AssignOp, BinaryOp, UnaryOp};
 
 grammar<'err>(errors: &'err mut Vec<ParseError<usize, Token<'input>, &'static str>>);
 
@@ -16,20 +16,11 @@ match {
   _
 }
 
-Comma<T>: Vec<T> = {
-  <mut v:(<T> ",")*> <e:T?> => match e {
-    None => v,
-    Some(e) => {
-      v.push(e);
-      v
-    }
-  },
+pub Ast: Ast = {
+  Stmt* Expr? => Ast(<>),
 };
 
 // statements!
-pub Stmts = {
-  Stmt*
-};
 Stmt: Box<Stmt> = {
   Function,
   Declaration,
@@ -55,7 +46,7 @@ Break: Box<Stmt> = {
 
 // expressions!
 
-pub Expr: Box<Expr> = {
+Expr: Box<Expr> = {
   Assignment,
 };
 
@@ -187,6 +178,15 @@ Block: Box<Expr> = {
   "{" <Stmt*> <Expr?> "}" => Box::new(Expr::Block(<>))
 };
 
+Comma<T>: Vec<T> = {
+  <mut v:(<T> ",")*> <e:T?> => match e {
+    None => v,
+    Some(e) => {
+      v.push(e);
+      v
+    }
+  },
+};
 Field: (String, Box<Expr>) = {
   <IdentOrString> ":" <Expr> => (<>),
 };

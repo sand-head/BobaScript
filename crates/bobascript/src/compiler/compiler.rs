@@ -22,25 +22,16 @@ impl Compiler {
   }
 
   pub fn compile(&mut self, ast: &Ast) -> CompileResult<Rc<Function>> {
-    for stmt in ast {
+    let Ast(stmts, expr) = ast;
+
+    for stmt in stmts {
       self.statement(stmt);
     }
-
-    self.emit_opcode(OpCode::Tuple(0));
-    let function = self.end_compiler();
-
-    if self.errors.is_empty() {
-      Ok(function)
+    if let Some(expr) = expr {
+      self.expression(expr);
     } else {
-      let first = self.errors.pop().unwrap();
-      self.errors.clear();
-      Err(first)
+      self.emit_opcode(OpCode::Tuple(0));
     }
-  }
-
-  /// Compiles a single expression and returns its containing function.
-  pub fn compile_expr(&mut self, expr: &Box<Expr>) -> CompileResult<Rc<Function>> {
-    self.expression(expr);
 
     let function = self.end_compiler();
     if self.errors.is_empty() {

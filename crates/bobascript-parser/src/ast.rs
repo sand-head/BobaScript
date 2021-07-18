@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-pub type Ast = Vec<Box<Stmt>>;
+#[derive(Debug)]
+pub struct Ast(pub Vec<Box<Stmt>>, pub Option<Box<Expr>>);
 
 #[derive(Debug)]
 pub enum Stmt {

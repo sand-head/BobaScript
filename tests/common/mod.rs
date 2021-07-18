@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! assert_eval {
   ($vm:expr, $eval:expr, $expected:expr) => {
-    let function = bobascript::compiler::compile_expr($eval).unwrap();
+    let function = bobascript::compiler::compile($eval).unwrap();
     let result = $vm.evaluate(function);
     println!("eval result: {:?}", result);
     let value = result.unwrap();

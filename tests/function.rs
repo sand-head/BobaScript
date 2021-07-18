@@ -1,7 +1,7 @@
 use std::{cell::RefCell, convert::TryInto, rc::Rc};
 
 use bobascript::{
-  compiler::{compile, compile_expr},
+  compiler::compile,
   value::{NativeFunction, Value},
   vm::{RuntimeError, VM},
 };

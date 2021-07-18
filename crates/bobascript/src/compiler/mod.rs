@@ -1,9 +1,6 @@
 use std::rc::Rc;
 
-use bobascript_parser::{
-  grammar::{ExprParser, StmtsParser},
-  Parser, SyntaxError,
-};
+use bobascript_parser::{grammar::AstParser, Parser, SyntaxError};
 use thiserror::Error;
 
 use self::compiler::Compiler;
@@ -106,17 +103,7 @@ pub fn compile<S>(source: S) -> CompileResult<Rc<Function>>
 where
   S: Into<String>,
 {
-  let ast = StmtsParser::parse_ast(&source.into())?;
+  let ast = AstParser::parse_ast(&source.into())?;
   let mut compiler = Compiler::new();
   compiler.compile(&ast)
-}
-
-/// Compiles a single expression and returns its resulting function.
-pub fn compile_expr<S>(source: S) -> CompileResult<Rc<Function>>
-where
-  S: Into<String>,
-{
-  let ast = ExprParser::parse_ast(&source.into())?;
-  let mut compiler = Compiler::new();
-  compiler.compile_expr(&ast)
 }
