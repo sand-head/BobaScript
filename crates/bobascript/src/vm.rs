@@ -84,23 +84,7 @@ impl VM {
     self.pop_n(2);
   }
 
-  pub fn interpret(&mut self, function: Rc<Function>) -> InterpretResult<()> {
-    self.push(Value::Function(function.clone()));
-    let closure = Closure {
-      function,
-      upvalues: Vec::new(),
-    };
-    self.pop();
-    self.push(Value::Closure(closure.clone()));
-    self.call(closure, 0)?;
-
-    let result = self.run();
-    self.stack.clear();
-    self.frames.clear();
-    result.map(|_| ())
-  }
-
-  pub fn evaluate(&mut self, function: Rc<Function>) -> InterpretResult<Value> {
+  pub fn interpret(&mut self, function: Rc<Function>) -> InterpretResult<Value> {
     self.push(Value::Function(function.clone()));
     let closure = Closure {
       function,

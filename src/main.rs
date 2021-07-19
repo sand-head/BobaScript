@@ -46,8 +46,9 @@ fn main() -> InterpretResult<()> {
       Ok(input) => {
         rl.add_history_entry(&input);
         let function = compile(input)?;
-        if let Err(err) = vm.interpret(function) {
-          print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?;
+        match vm.interpret(function) {
+          Ok(value) => println!("< {}", value),
+          Err(err) => print_error(format!("{}", err)).map_err(|_| InterpretError::Unknown)?,
         }
       }
       Err(ReadlineError::Interrupted) => {
