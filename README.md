@@ -8,6 +8,7 @@
   [![Crates.io](https://img.shields.io/crates/v/bobascript?style=flat-square)](https://crates.io/crates/bobascript)
   [![CI](https://img.shields.io/github/workflow/status/sand-head/BobaScript/CI?event=push&style=flat-square)](https://github.com/sand-head/BobaScript/actions/workflows/ci.yml)
   [![Open in VS Code](https://img.shields.io/badge/open-in_Visual_Studio_Code-blue?logo=visualstudiocode&style=flat-square)](https://open.vscode.dev/sand-head/BobaScript)
+  [![Matrix](https://img.shields.io/matrix/bobascript:schweigert.dev?server_fqdn=schweigert.dev&style=flat-square)](https://matrix.to/#/#bobascript:schweigert.dev)
 
 </div>
 
